@@ -217,7 +217,10 @@ const ChartManager = (() => {
     historyMarkers = [];
     for (const s of signals) {
       if (!s.bar_time) continue;
-      const ts = Math.floor(new Date(s.bar_time.replace(' ', 'T').replace(/\+00:00$/, 'Z').replace(/$/, s.bar_time.includes('Z') || s.bar_time.includes('+') ? '' : 'Z')).getTime() / 1000);
+      // bar_time format: "2026-03-31 08:45:00+00:00" — normalize to ISO
+      let isoTime = s.bar_time.replace(' ', 'T');
+      if (!isoTime.includes('Z') && !isoTime.includes('+')) isoTime += 'Z';
+      const ts = Math.floor(new Date(isoTime).getTime() / 1000);
       const dir = s.direction || '';
       const outcome = s.outcome || '';
       const label = dir.substring(0, 1) + (outcome ? ' ' + outcome : '');
