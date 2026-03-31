@@ -15,6 +15,7 @@
   // No auth needed — public endpoints, CORS-restricted by bridge
 
   let currentSymbol = 'XAUUSD';
+  let switchId      = 0;            // incremented on every symbol switch to discard stale responses
   let signalHistory = [];
   let pollTimer     = null;
   let candleTimer   = null;
@@ -64,47 +65,54 @@
     });
   }
 
-  async function switchSymbol(sym) {
+  function switchSymbol(sym) {
     currentSymbol = sym;
+    const mySwitch = ++switchId;  // capture switch generation
     chartSymbol.textContent = sym;
     chartLastBar.textContent = '--';
     ChartManager.setSymbol(sym);
     resetSignalPanel();
-    // Load candles first so markers have data to attach to
-    await fetchCandles();
-    fetchSignal();
-    fetchHistory();
-    // Reset timers
+    // Reset timers immediately
     clearInterval(pollTimer);
     clearInterval(candleTimer);
     clearInterval(historyTimer);
-    pollTimer    = setInterval(fetchSignal,  POLL_INTERVAL_MS);
-    candleTimer  = setInterval(fetchCandles, CANDLE_POLL_MS);
-    historyTimer = setInterval(fetchHistory, CANDLE_POLL_MS);
+    // Fetch candles first, then signal + history — all guarded by switchId
+    fetchCandles(mySwitch).then(() => {
+      if (switchId !== mySwitch) return;  // symbol changed while fetching
+      fetchSignal(mySwitch);
+      fetchHistory(mySwitch);
+    });
+    pollTimer    = setInterval(() => fetchSignal(switchId),  POLL_INTERVAL_MS);
+    candleTimer  = setInterval(() => fetchCandles(switchId), CANDLE_POLL_MS);
+    historyTimer = setInterval(() => fetchHistory(switchId), CANDLE_POLL_MS);
   }
 
   // ── Fetch Candles ───────────────────────────────────────────────────
-  async function fetchCandles() {
+  async function fetchCandles(gen) {
     try {
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/candles/${currentSymbol}?limit=300`, {});
+      const sym = currentSymbol;
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/candles/${sym}?limit=300`);
+      if (gen !== undefined && gen !== switchId) return;  // stale
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
+      if (gen !== undefined && gen !== switchId) return;  // stale
       if (data.candles && data.candles.length > 0) {
         ChartManager.setCandles(data.candles);
         setConnected(true);
       }
     } catch (err) {
       console.warn('Candle fetch error:', err.message);
-      // Not critical — signals still work
     }
   }
 
   // ── Fetch Signal ────────────────────────────────────────────────────
-  async function fetchSignal() {
+  async function fetchSignal(gen) {
     try {
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals`, {});
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals`);
+      if (gen !== undefined && gen !== switchId) return;  // stale
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
+      if (gen !== undefined && gen !== switchId) return;  // stale
       setConnected(true);
 
       const sig = data[currentSymbol];
@@ -126,11 +134,14 @@
   }
 
   // ── Fetch History ──────────────────────────────────────────────────
-  async function fetchHistory() {
+  async function fetchHistory(gen) {
     try {
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals/${currentSymbol}/history?limit=5`, {});
+      const sym = currentSymbol;
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals/${sym}/history?limit=5`);
+      if (gen !== undefined && gen !== switchId) return;  // stale
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
+      if (gen !== undefined && gen !== switchId) return;  // stale
       if (data.signals && data.signals.length > 0) {
         ChartManager.drawHistoryMarkers(data.signals);
       }

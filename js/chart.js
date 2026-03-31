@@ -144,17 +144,14 @@ const ChartManager = (() => {
     ro.observe(container);
   }
 
-  function _applyPriceFormat() {
-    if (!candleSeries) return;
+  function setCandles(candles) {
+    if (!candleSeries || !candles || candles.length === 0) return;
+    // Apply price format BEFORE setting data so axis renders correctly
     const dec = PRICE_DECIMALS[currentSymbol] || 2;
     const minMove = PRICE_MIN_MOVE[currentSymbol] || 0.01;
     candleSeries.applyOptions({
       priceFormat: { type: 'price', precision: dec, minMove: minMove },
     });
-  }
-
-  function setCandles(candles) {
-    if (!candleSeries || !candles || candles.length === 0) return;
     candleSeries.setData(candles);
     // Re-apply markers after setData (setData resets markers)
     _mergeAndSetMarkers();
@@ -167,10 +164,15 @@ const ChartManager = (() => {
   }
 
   function clearSignalLines() {
-    if (slLine)    { candleSeries.removePriceLine(slLine);    slLine = null; }
-    if (tp1Line)   { candleSeries.removePriceLine(tp1Line);   tp1Line = null; }
-    if (tp2Line)   { candleSeries.removePriceLine(tp2Line);   tp2Line = null; }
-    if (entryLine) { candleSeries.removePriceLine(entryLine); entryLine = null; }
+    // Safely remove price lines — try-catch each in case series state changed
+    try { if (slLine)    { candleSeries.removePriceLine(slLine); } } catch(e) {}
+    try { if (tp1Line)   { candleSeries.removePriceLine(tp1Line); } } catch(e) {}
+    try { if (tp2Line)   { candleSeries.removePriceLine(tp2Line); } } catch(e) {}
+    try { if (entryLine) { candleSeries.removePriceLine(entryLine); } } catch(e) {}
+    slLine = null;
+    tp1Line = null;
+    tp2Line = null;
+    entryLine = null;
     hasActiveSignal = false;
   }
 
@@ -244,7 +246,6 @@ const ChartManager = (() => {
         shape: dir === 'BUY' ? 'arrowUp' : 'arrowDown',
         text: dir,
       };
-      // Keep last 50 markers
       markers.push(marker);
       if (markers.length > 50) markers = markers.slice(-50);
       _mergeAndSetMarkers();
@@ -262,7 +263,6 @@ const ChartManager = (() => {
     historyMarkers = [];
     for (const s of signals) {
       if (!s.bar_time) continue;
-      // bar_time format: "2026-03-31 08:45:00+00:00" — normalize to ISO
       let isoTime = s.bar_time.replace(' ', 'T');
       if (!isoTime.includes('Z') && !isoTime.includes('+')) isoTime += 'Z';
       const ts = Math.floor(new Date(isoTime).getTime() / 1000);
@@ -282,12 +282,15 @@ const ChartManager = (() => {
 
   function _mergeAndSetMarkers() {
     if (!candleSeries) return;
-    // Merge live markers + history markers, deduplicate by time+shape
     const all = [...markers, ...historyMarkers];
     const unique = {};
     all.forEach(m => { unique[m.time + '_' + m.shape + '_' + m.position] = m; });
     const sorted = Object.values(unique).sort((a, b) => a.time - b.time);
-    candleSeries.setMarkers(sorted);
+    try {
+      candleSeries.setMarkers(sorted);
+    } catch(e) {
+      // Markers may reference times outside candle data range — safe to ignore
+    }
   }
 
   function setSymbol(sym) {
@@ -297,8 +300,11 @@ const ChartManager = (() => {
     historySignals = [];
     hasActiveSignal = false;
     expandedTs = null;
-    clearSignalLines();
-    _applyPriceFormat();
+    // Null out line refs — setData([]) below will destroy them
+    slLine = null;
+    tp1Line = null;
+    tp2Line = null;
+    entryLine = null;
     if (candleSeries) {
       candleSeries.setData([]);
       candleSeries.setMarkers([]);
