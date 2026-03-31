@@ -1,5 +1,5 @@
 /**
- * MLBot Live — Chart Module
+ * DDD Signals — Chart Module
  * TradingView Lightweight Charts integration
  */
 
@@ -19,6 +19,7 @@ const ChartManager = (() => {
 
   let markers = [];
   let liveSignalTs = null;      // timestamp of current live signal (to deduplicate vs history)
+  let liveSignalDir = null;     // direction of current live signal ('BUY'/'SELL')
   let historyMarkers = [];
   let historySignals = [];
   let currentSymbol = 'XAUUSD';
@@ -252,6 +253,7 @@ const ChartManager = (() => {
     // Single arrow marker for the current live signal (replaces any previous)
     markers = [];
     liveSignalTs = null;
+    liveSignalDir = dir;
     if (signal.last_bar) {
       const ts = Math.floor(new Date(signal.last_bar + (signal.last_bar.includes('Z') ? '' : 'Z')).getTime() / 1000);
       liveSignalTs = ts;
@@ -285,8 +287,8 @@ const ChartManager = (() => {
       let isoTime = s.bar_time.replace(' ', 'T');
       if (!isoTime.includes('Z') && !isoTime.includes('+')) isoTime += 'Z';
       const ts = Math.floor(new Date(isoTime).getTime() / 1000);
-      // Skip if this is the same bar as the live signal
-      if (liveSignalTs && ts === liveSignalTs) continue;
+      // Skip if this is the same bar AND same direction as the live signal
+      if (liveSignalTs && ts === liveSignalTs && dir === liveSignalDir) continue;
       const dir = s.direction || '';
       const isPending = (s.outcome === null || s.outcome === undefined);
 
@@ -307,11 +309,18 @@ const ChartManager = (() => {
   function _mergeAndSetMarkers() {
     if (!candleSeries) return;
     const all = [...markers, ...historyMarkers];
-    const unique = {};
-    all.forEach(m => { unique[m.time + '_' + m.shape + '_' + m.position] = m; });
-    const sorted = Object.values(unique).sort((a, b) => a.time - b.time);
+    // Live arrows take precedence over history circles on same bar+position
+    const arrowKeys = new Set();
+    for (const m of all) {
+      if (m.shape !== 'circle') arrowKeys.add(m.time + '_' + m.position);
+    }
+    const filtered = all.filter(m => {
+      if (m.shape === 'circle' && arrowKeys.has(m.time + '_' + m.position)) return false;
+      return true;
+    });
+    filtered.sort((a, b) => a.time - b.time);
     try {
-      candleSeries.setMarkers(sorted);
+      candleSeries.setMarkers(filtered);
     } catch(e) {}
   }
 
@@ -323,6 +332,7 @@ const ChartManager = (() => {
     hasActiveSignal = false;
     expandedTs = null;
     liveSignalTs = null;
+    liveSignalDir = null;
     slLine = null; tp1Line = null; tp2Line = null; entryLine = null;
     histSlLine = null; histTp1Line = null; histTp2Line = null; histEntryLine = null;
     if (candleSeries) {

@@ -1,5 +1,5 @@
 /**
- * MLBot Live — Main Application
+ * DDD Signals — Main Application
  * Polls bridge for signals + candles, updates UI
  */
 
