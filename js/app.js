@@ -12,9 +12,7 @@
   const CANDLE_POLL_MS   = 60000;   // poll candles every 60s
   const MAX_HISTORY      = 50;
 
-  // Domain-bound API key: HMAC(secret, origin) — only valid from this origin
-  const DASHBOARD_KEY = '724869081ac77c5c960a2f4b8385a993';
-  const API_HEADERS   = { 'X-Dashboard-Key': DASHBOARD_KEY };
+  // No auth needed — public endpoints, CORS-restricted by bridge
 
   let currentSymbol = 'XAUUSD';
   let signalHistory = [];
@@ -83,7 +81,7 @@
   // ── Fetch Candles ───────────────────────────────────────────────────
   async function fetchCandles() {
     try {
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/candles/${currentSymbol}?limit=300`, { headers: API_HEADERS });
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/candles/${currentSymbol}?limit=300`, {});
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       if (data.candles && data.candles.length > 0) {
@@ -99,7 +97,7 @@
   // ── Fetch Signal ────────────────────────────────────────────────────
   async function fetchSignal() {
     try {
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals`, { headers: API_HEADERS });
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals`, {});
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       setConnected(true);
