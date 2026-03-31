@@ -120,6 +120,8 @@ const ChartManager = (() => {
   function setCandles(candles) {
     if (!candleSeries || !candles || candles.length === 0) return;
     candleSeries.setData(candles);
+    // Re-apply markers after setData (setData resets markers)
+    _mergeAndSetMarkers();
     chart.timeScale().fitContent();
   }
 

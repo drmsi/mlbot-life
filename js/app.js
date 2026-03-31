@@ -64,13 +64,14 @@
     });
   }
 
-  function switchSymbol(sym) {
+  async function switchSymbol(sym) {
     currentSymbol = sym;
     chartSymbol.textContent = sym;
     chartLastBar.textContent = '--';
     ChartManager.setSymbol(sym);
     resetSignalPanel();
-    fetchCandles();
+    // Load candles first so markers have data to attach to
+    await fetchCandles();
     fetchSignal();
     fetchHistory();
     // Reset timers
