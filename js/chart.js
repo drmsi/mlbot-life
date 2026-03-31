@@ -155,6 +155,8 @@ const ChartManager = (() => {
     candleSeries.setData(candles);
     // Re-apply markers after setData (setData resets markers)
     _mergeAndSetMarkers();
+    // Reset both time and price scales to fit new symbol's data
+    candleSeries.priceScale().applyOptions({ autoScale: true });
     chart.timeScale().fitContent();
   }
 
