@@ -378,6 +378,43 @@ a:hover { color: #818cf8; }
 .footer-copy { font-size: 0.75rem; color: var(--text-muted); }
 .footer-powered { font-size: 0.7rem; }
 
+/* ═══ SIGNAL TOOLTIP ═══ */
+.signal-tooltip {
+  display: none;
+  position: fixed;
+  z-index: 200;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  min-width: 200px;
+  max-width: 240px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  font-size: 0.8rem;
+  pointer-events: none;
+}
+.signal-tooltip .tt-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+.signal-tooltip .tt-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.signal-tooltip .tt-row span:first-child {
+  color: var(--text-muted);
+  font-family: var(--font-main);
+}
+.signal-tooltip .tt-row span:last-child {
+  color: var(--text-secondary);
+}
+
 /* ═══ RESPONSIVE ═══ */
 @media (max-width: 900px) {
   .dashboard-grid { grid-template-columns: 1fr; }

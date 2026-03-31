@@ -18,6 +18,7 @@
   let signalHistory = [];
   let pollTimer     = null;
   let candleTimer   = null;
+  let historyTimer  = null;
   let connected     = false;
 
   // ── DOM refs ────────────────────────────────────────────────────────
@@ -71,11 +72,14 @@
     resetSignalPanel();
     fetchCandles();
     fetchSignal();
+    fetchHistory();
     // Reset timers
     clearInterval(pollTimer);
     clearInterval(candleTimer);
-    pollTimer   = setInterval(fetchSignal,  POLL_INTERVAL_MS);
-    candleTimer = setInterval(fetchCandles, CANDLE_POLL_MS);
+    clearInterval(historyTimer);
+    pollTimer    = setInterval(fetchSignal,  POLL_INTERVAL_MS);
+    candleTimer  = setInterval(fetchCandles, CANDLE_POLL_MS);
+    historyTimer = setInterval(fetchHistory, CANDLE_POLL_MS);
   }
 
   // ── Fetch Candles ───────────────────────────────────────────────────
@@ -117,6 +121,20 @@
     } catch (err) {
       console.warn('Signal fetch error:', err.message);
       setConnected(false);
+    }
+  }
+
+  // ── Fetch History ──────────────────────────────────────────────────
+  async function fetchHistory() {
+    try {
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals/${currentSymbol}/history?limit=5`, {});
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (data.signals && data.signals.length > 0) {
+        ChartManager.drawHistoryMarkers(data.signals);
+      }
+    } catch (err) {
+      console.warn('History fetch error:', err.message);
     }
   }
 
