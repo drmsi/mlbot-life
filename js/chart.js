@@ -101,7 +101,17 @@ const ChartManager = (() => {
         return;
       }
 
-      const match = historySignals.find(s => s._ts === param.time);
+      // Find nearest history marker within 3 bars (900s for M5)
+      const SNAP_SEC = 900;
+      let match = null;
+      let bestDist = Infinity;
+      for (const s of historySignals) {
+        const dist = Math.abs(s._ts - param.time);
+        if (dist < bestDist && dist <= SNAP_SEC) {
+          bestDist = dist;
+          match = s;
+        }
+      }
       if (!match) {
         tooltip.style.display = 'none';
         expandedTs = null;
