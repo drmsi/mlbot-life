@@ -246,27 +246,23 @@ const ChartManager = (() => {
     hasActiveSignal = true;
     // When live signal is active, remove history price lines (live takes priority)
     _clearHistoryPriceLines();
-    const tooltip = document.getElementById('signalTooltip');
-    if (tooltip) tooltip.style.display = 'none';
-    expandedTs = null;
 
     // Draw price lines for live signal
     _drawPriceLines({ price: signal.price, sl: signal.sl, tp1: signal.tp, tp2: signal.tp2 }, 'live');
 
-    // Add arrow marker on the last candle
+    // Single arrow marker for the current live signal (replaces any previous)
+    markers = [];
     if (signal.last_bar) {
       const ts = Math.floor(new Date(signal.last_bar + (signal.last_bar.includes('Z') ? '' : 'Z')).getTime() / 1000);
-      const marker = {
+      markers = [{
         time: ts,
         position: dir === 'BUY' ? 'belowBar' : 'aboveBar',
         color: dir === 'BUY' ? '#22c55e' : '#ef4444',
         shape: dir === 'BUY' ? 'arrowUp' : 'arrowDown',
         text: dir,
-      };
-      markers.push(marker);
-      if (markers.length > 50) markers = markers.slice(-50);
-      _mergeAndSetMarkers();
+      }];
     }
+    _mergeAndSetMarkers();
   }
 
   function drawHistoryMarkers(signals) {
@@ -282,22 +278,7 @@ const ChartManager = (() => {
     historySignals = [];
     historyMarkers = [];
 
-    // Separate pending (still running) vs completed
-    const pending = [];
-    const completed = [];
-    for (const s of signals) {
-      if (!s.bar_time) continue;
-      if (s.outcome === null || s.outcome === undefined) {
-        pending.push(s);
-      } else {
-        completed.push(s);
-      }
-    }
-
-    // Most recent pending signal gets full price lines (if no live signal active)
-    const expandedPending = (!hasActiveSignal && pending.length > 0) ? pending[0] : null;
-
-    // Build markers for all signals
+    // Build markers — all history signals are circle dots
     for (const s of signals) {
       if (!s.bar_time) continue;
       let isoTime = s.bar_time.replace(' ', 'T');
@@ -305,39 +286,19 @@ const ChartManager = (() => {
       const ts = Math.floor(new Date(isoTime).getTime() / 1000);
       const dir = s.direction || '';
       const isPending = (s.outcome === null || s.outcome === undefined);
-      const isExpanded = (expandedPending && s === expandedPending);
-
-      let color, shape;
-      if (isExpanded) {
-        // Most recent pending — arrow marker (expanded with price lines)
-        color = dir === 'BUY' ? '#22c55e' : '#ef4444';
-        shape = dir === 'BUY' ? 'arrowUp' : 'arrowDown';
-      } else if (isPending) {
-        // Other pending — bright glow circle (still running)
-        color = dir === 'BUY' ? GLOW_BUY : GLOW_SELL;
-        shape = 'circle';
-      } else {
-        // Completed — regular dim circle
-        color = dir === 'BUY' ? '#22c55e' : '#ef4444';
-        shape = 'circle';
-      }
 
       historyMarkers.push({
         time: ts,
         position: dir === 'BUY' ? 'belowBar' : 'aboveBar',
-        color: color,
-        shape: shape,
-        text: isPending && !isExpanded ? '\u25CF' : '',
+        color: isPending ? (dir === 'BUY' ? GLOW_BUY : GLOW_SELL)
+                         : (dir === 'BUY' ? '#22c55e' : '#ef4444'),
+        shape: 'circle',
+        text: '',
       });
       historySignals.push({ ...s, _ts: ts });
     }
 
     _mergeAndSetMarkers();
-
-    // Draw price lines for the most recent pending signal
-    if (expandedPending) {
-      _drawPriceLines(expandedPending, 'hist');
-    }
   }
 
   function _mergeAndSetMarkers() {
