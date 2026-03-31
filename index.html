@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLBot Live — AI-Powered Trading Signals</title>
+  <meta name="description" content="Real-time AI trading signals powered by LightGBM machine learning. Live XAUUSD, BTCUSD, EURUSD signals with entry, SL, TP levels.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+
+  <!-- ═══ HEADER ═══ -->
+  <header class="header">
+    <div class="container header-inner">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="32" height="32" rx="8" fill="url(#grad1)"/>
+            <path d="M8 22L12 14L16 18L20 10L24 16" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="14" r="2" fill="#fff"/>
+            <circle cx="20" cy="10" r="2" fill="#fff"/>
+            <defs><linearGradient id="grad1" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+          </svg>
+        </div>
+        <span class="logo-text">MLBot<span class="logo-accent">Live</span></span>
+      </div>
+      <div class="header-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Connecting...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <div class="container">
+      <h1 class="hero-title">
+        AI-Powered Trading Signals
+        <span class="hero-highlight">in Real Time</span>
+      </h1>
+      <p class="hero-subtitle">
+        Watch our LightGBM machine learning model analyze markets live.
+        Every 5 minutes, the model processes 80+ technical features across multiple symbols
+        to generate high-probability BUY, SELL, or HOLD signals — complete with
+        precise entry, stop-loss, and take-profit levels.
+      </p>
+      <div class="hero-stats">
+        <div class="stat-card">
+          <span class="stat-value">80+</span>
+          <span class="stat-label">ML Features</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">8</span>
+          <span class="stat-label">Symbols</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">M5</span>
+          <span class="stat-label">Timeframe</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">3-Class</span>
+          <span class="stat-label">Model</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ SYMBOL SELECTOR ═══ -->
+  <section class="symbols-section">
+    <div class="container">
+      <div class="symbol-buttons" id="symbolButtons">
+        <button class="sym-btn active" data-symbol="XAUUSD">
+          <span class="sym-icon">&#x1F947;</span>
+          <span class="sym-name">XAUUSD</span>
+          <span class="sym-label">Gold</span>
+        </button>
+        <button class="sym-btn" data-symbol="BTCUSD">
+          <span class="sym-icon">&#x20BF;</span>
+          <span class="sym-name">BTCUSD</span>
+          <span class="sym-label">Bitcoin</span>
+        </button>
+        <button class="sym-btn" data-symbol="EURUSD">
+          <span class="sym-icon">&#x20AC;</span>
+          <span class="sym-name">EURUSD</span>
+          <span class="sym-label">Euro</span>
+        </button>
+        <button class="sym-btn" data-symbol="ETHUSD">
+          <span class="sym-icon">&#x039E;</span>
+          <span class="sym-name">ETHUSD</span>
+          <span class="sym-label">Ethereum</span>
+        </button>
+        <button class="sym-btn" data-symbol="GBPUSD">
+          <span class="sym-icon">&#x00A3;</span>
+          <span class="sym-name">GBPUSD</span>
+          <span class="sym-label">Pound</span>
+        </button>
+        <button class="sym-btn" data-symbol="XAGUSD">
+          <span class="sym-icon">&#x26C1;</span>
+          <span class="sym-name">XAGUSD</span>
+          <span class="sym-label">Silver</span>
+        </button>
+        <button class="sym-btn" data-symbol="USDJPY">
+          <span class="sym-icon">&#x00A5;</span>
+          <span class="sym-name">USDJPY</span>
+          <span class="sym-label">Yen</span>
+        </button>
+        <button class="sym-btn" data-symbol="BRENTCMDUSD">
+          <span class="sym-icon">&#x26FD;</span>
+          <span class="sym-name">BRENT</span>
+          <span class="sym-label">Oil</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ CHART + SIGNAL PANEL ═══ -->
+  <section class="dashboard">
+    <div class="container dashboard-grid">
+      <!-- Chart -->
+      <div class="chart-wrapper">
+        <div class="chart-header">
+          <div class="chart-symbol" id="chartSymbol">XAUUSD</div>
+          <div class="chart-tf">M5</div>
+          <div class="chart-last-bar" id="chartLastBar">--</div>
+        </div>
+        <div class="chart-container" id="chartContainer"></div>
+      </div>
+
+      <!-- Signal Panel -->
+      <div class="signal-panel">
+        <div class="signal-card" id="signalCard">
+          <div class="signal-direction-wrap">
+            <div class="signal-direction" id="signalDirection">HOLD</div>
+            <div class="signal-strength" id="signalStrength"></div>
+          </div>
+          <div class="signal-meta">
+            <span class="signal-model" id="signalModel">--</span>
+            <span class="signal-age" id="signalAge">--</span>
+          </div>
+          <div class="signal-prices">
+            <div class="price-row entry">
+              <span class="price-label">Entry</span>
+              <span class="price-value" id="priceEntry">--</span>
+            </div>
+            <div class="price-row sl">
+              <span class="price-label">Stop Loss</span>
+              <span class="price-value" id="priceSL">--</span>
+            </div>
+            <div class="price-row tp1">
+              <span class="price-label">Take Profit 1</span>
+              <span class="price-value" id="priceTP1">--</span>
+            </div>
+            <div class="price-row tp2">
+              <span class="price-label">Take Profit 2</span>
+              <span class="price-value" id="priceTP2">--</span>
+            </div>
+          </div>
+          <div class="signal-probs">
+            <div class="prob-bar-wrap">
+              <span class="prob-label">BUY</span>
+              <div class="prob-bar"><div class="prob-fill buy" id="probBuy" style="width:0%"></div></div>
+              <span class="prob-pct" id="probBuyPct">--</span>
+            </div>
+            <div class="prob-bar-wrap">
+              <span class="prob-label">HOLD</span>
+              <div class="prob-bar"><div class="prob-fill hold" id="probHold" style="width:0%"></div></div>
+              <span class="prob-pct" id="probHoldPct">--</span>
+            </div>
+            <div class="prob-bar-wrap">
+              <span class="prob-label">SELL</span>
+              <div class="prob-bar"><div class="prob-fill sell" id="probSell" style="width:0%"></div></div>
+              <span class="prob-pct" id="probSellPct">--</span>
+            </div>
+          </div>
+          <div class="signal-details">
+            <div class="detail-row">
+              <span>ATR</span><span id="detailATR">--</span>
+            </div>
+            <div class="detail-row">
+              <span>Regime</span><span id="detailRegime">--</span>
+            </div>
+            <div class="detail-row">
+              <span>H1 Gate</span><span id="detailH1">--</span>
+            </div>
+            <div class="detail-row">
+              <span>Risk Mult.</span><span id="detailRisk">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ SIGNAL HISTORY ═══ -->
+  <section class="history-section">
+    <div class="container">
+      <h2 class="section-title">Recent Signals</h2>
+      <div class="history-table-wrap">
+        <table class="history-table" id="historyTable">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Symbol</th>
+              <th>Signal</th>
+              <th>Entry</th>
+              <th>SL</th>
+              <th>TP1</th>
+              <th>TP2</th>
+              <th>Strength</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr class="empty-row"><td colspan="8">Waiting for signals...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FEATURES ═══ -->
+  <section class="features-section">
+    <div class="container">
+      <h2 class="section-title">How It Works</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">&#x1F9E0;</div>
+          <h3>Machine Learning</h3>
+          <p>LightGBM gradient boosting model trained on 2.6M+ samples across 8 symbols with 80 engineered features.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#x23F1;</div>
+          <h3>Real-Time Signals</h3>
+          <p>Every 5 minutes, fresh M5 candle data is analyzed. Signals include entry, stop-loss, TP1 &amp; TP2 levels.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#x1F3AF;</div>
+          <h3>Multi-Layer Filtering</h3>
+          <p>Ratio gating, regime detection, H1 confluence gate, and ATR-based risk management filter out noise.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#x1F4CA;</div>
+          <h3>Transparent Probabilities</h3>
+          <p>See the raw BUY/HOLD/SELL probabilities, strength bars, and regime state behind every signal.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ DISCLAIMER ═══ -->
+  <section class="disclaimer-section">
+    <div class="container">
+      <div class="disclaimer-box">
+        <strong>Disclaimer:</strong> This dashboard displays AI-generated trading signals for educational and informational purposes only.
+        These signals do not constitute financial advice. Trading forex, commodities, and cryptocurrencies involves substantial risk of loss.
+        Past performance does not guarantee future results. Always do your own research and consult a qualified financial advisor before trading.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-text">MLBot<span class="logo-accent">Live</span></span>
+        <p class="footer-tagline">AI-Powered Trading Intelligence</p>
+      </div>
+      <div class="footer-links">
+        <a href="https://drmsi.com" target="_blank" rel="noopener">DrMSI.com</a>
+        <a href="https://drmsi.com/about" target="_blank" rel="noopener">About</a>
+        <a href="https://drmsi.com/contact" target="_blank" rel="noopener">Contact</a>
+      </div>
+      <div class="footer-copy">
+        &copy; 2026 <a href="https://drmsi.com" target="_blank" rel="noopener">DrMSI</a>. All rights reserved.
+        <br><span class="footer-powered">Powered by LightGBM &bull; Built with passion</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/chart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
