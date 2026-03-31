@@ -14,10 +14,17 @@ const ChartManager = (() => {
   let historyMarkers = [];
   let historySignals = [];  // raw signal data for tooltip lookup
   let currentSymbol = 'XAUUSD';
+  let hasActiveSignal = false;  // true when BUY/SELL price lines are drawn
+  let expandedTs = null;        // timestamp of currently expanded history marker
 
   const PRICE_DECIMALS = {
     XAUUSD: 2, BTCUSD: 2, ETHUSD: 2, EURUSD: 5,
     GBPUSD: 5, XAGUSD: 3, USDJPY: 3, BRENTCMDUSD: 2,
+  };
+
+  const PRICE_MIN_MOVE = {
+    XAUUSD: 0.01, BTCUSD: 0.01, ETHUSD: 0.01, EURUSD: 0.00001,
+    GBPUSD: 0.00001, XAGUSD: 0.001, USDJPY: 0.001, BRENTCMDUSD: 0.01,
   };
 
   function init(containerId) {
@@ -65,20 +72,40 @@ const ChartManager = (() => {
       wickDownColor: '#ef444488',
     });
 
-    // Crosshair tooltip for history markers
-    chart.subscribeCrosshairMove(param => {
+    // Click handler for history marker expansion
+    chart.subscribeClick(param => {
       const tooltip = document.getElementById('signalTooltip');
-      if (!tooltip || historySignals.length === 0) return;
-      if (!param.time || !param.point) {
+      if (!tooltip) return;
+
+      // If active signal is showing, don't expand history markers
+      if (hasActiveSignal) {
         tooltip.style.display = 'none';
+        expandedTs = null;
         return;
       }
-      // Find if crosshair time matches any history marker
+
+      if (!param.time || !param.point || historySignals.length === 0) {
+        tooltip.style.display = 'none';
+        expandedTs = null;
+        return;
+      }
+
+      // Find if clicked time matches any history marker
       const match = historySignals.find(s => s._ts === param.time);
       if (!match) {
         tooltip.style.display = 'none';
+        expandedTs = null;
         return;
       }
+
+      // Toggle: click same marker again to close
+      if (expandedTs === match._ts) {
+        tooltip.style.display = 'none';
+        expandedTs = null;
+        return;
+      }
+
+      expandedTs = match._ts;
       const dec = PRICE_DECIMALS[currentSymbol] || 2;
       const outcomeText = match.outcome || 'Pending';
       const outcomeClass = match.outcome === 'SL' ? 'sell'
@@ -92,14 +119,14 @@ const ChartManager = (() => {
         <div class="tt-row"><span>SL</span><span>${match.sl != null ? match.sl.toFixed(dec) : '--'}</span></div>
         <div class="tt-row"><span>TP1</span><span>${match.tp1 != null ? match.tp1.toFixed(dec) : '--'}</span></div>
         <div class="tt-row"><span>TP2</span><span>${match.tp2 != null ? match.tp2.toFixed(dec) : '--'}</span></div>
+        <div class="tt-row"><span>ATR</span><span>${match.atr != null ? match.atr : '--'}</span></div>
         <div class="tt-row"><span>Model</span><span>${match.model || '--'}</span></div>
         ${match.exit_price != null ? `<div class="tt-row"><span>Exit</span><span>${match.exit_price.toFixed(dec)}</span></div>` : ''}
       `;
-      // Position tooltip near crosshair
+      // Position tooltip near click point
       const chartRect = container.getBoundingClientRect();
       let left = param.point.x + chartRect.left + 16;
-      let top = param.point.y + chartRect.top - 40;
-      // Keep within viewport
+      let top = param.point.y + chartRect.top - 60;
       if (left + 220 > window.innerWidth) left = param.point.x + chartRect.left - 230;
       if (top < 0) top = 10;
       tooltip.style.left = left + 'px';
@@ -115,6 +142,15 @@ const ChartManager = (() => {
       }
     });
     ro.observe(container);
+  }
+
+  function _applyPriceFormat() {
+    if (!candleSeries) return;
+    const dec = PRICE_DECIMALS[currentSymbol] || 2;
+    const minMove = PRICE_MIN_MOVE[currentSymbol] || 0.01;
+    candleSeries.applyOptions({
+      priceFormat: { type: 'price', precision: dec, minMove: minMove },
+    });
   }
 
   function setCandles(candles) {
@@ -135,6 +171,7 @@ const ChartManager = (() => {
     if (tp1Line)   { candleSeries.removePriceLine(tp1Line);   tp1Line = null; }
     if (tp2Line)   { candleSeries.removePriceLine(tp2Line);   tp2Line = null; }
     if (entryLine) { candleSeries.removePriceLine(entryLine); entryLine = null; }
+    hasActiveSignal = false;
   }
 
   function drawSignal(signal) {
@@ -143,6 +180,12 @@ const ChartManager = (() => {
 
     const dir = signal.signal;
     if (dir !== 'BUY' && dir !== 'SELL') return;
+
+    hasActiveSignal = true;
+    // Close any expanded tooltip when active signal appears
+    const tooltip = document.getElementById('signalTooltip');
+    if (tooltip) tooltip.style.display = 'none';
+    expandedTs = null;
 
     const dec = PRICE_DECIMALS[currentSymbol] || 2;
     const entryPrice = signal.price;
@@ -224,15 +267,13 @@ const ChartManager = (() => {
       if (!isoTime.includes('Z') && !isoTime.includes('+')) isoTime += 'Z';
       const ts = Math.floor(new Date(isoTime).getTime() / 1000);
       const dir = s.direction || '';
-      const outcome = s.outcome || '';
-      const label = dir.substring(0, 1) + (outcome ? ' ' + outcome : '');
       const color = dir === 'BUY' ? '#22c55e' : '#ef4444';
       historyMarkers.push({
         time: ts,
         position: dir === 'BUY' ? 'belowBar' : 'aboveBar',
         color: color,
         shape: 'circle',
-        text: label,
+        text: '',
       });
       historySignals.push({ ...s, _ts: ts });
     }
@@ -241,10 +282,10 @@ const ChartManager = (() => {
 
   function _mergeAndSetMarkers() {
     if (!candleSeries) return;
-    // Merge live markers + history markers, deduplicate by time+text
+    // Merge live markers + history markers, deduplicate by time+shape
     const all = [...markers, ...historyMarkers];
     const unique = {};
-    all.forEach(m => { unique[m.time + '_' + m.text] = m; });
+    all.forEach(m => { unique[m.time + '_' + m.shape + '_' + m.position] = m; });
     const sorted = Object.values(unique).sort((a, b) => a.time - b.time);
     candleSeries.setMarkers(sorted);
   }
@@ -254,7 +295,10 @@ const ChartManager = (() => {
     markers = [];
     historyMarkers = [];
     historySignals = [];
+    hasActiveSignal = false;
+    expandedTs = null;
     clearSignalLines();
+    _applyPriceFormat();
     if (candleSeries) {
       candleSeries.setData([]);
       candleSeries.setMarkers([]);
