@@ -18,6 +18,7 @@ const ChartManager = (() => {
   let histEntryLine = null;
 
   let markers = [];
+  let liveSignalTs = null;      // timestamp of current live signal (to deduplicate vs history)
   let historyMarkers = [];
   let historySignals = [];
   let currentSymbol = 'XAUUSD';
@@ -244,16 +245,16 @@ const ChartManager = (() => {
     }
 
     hasActiveSignal = true;
-    // When live signal is active, remove history price lines (live takes priority)
     _clearHistoryPriceLines();
 
-    // Draw price lines for live signal
     _drawPriceLines({ price: signal.price, sl: signal.sl, tp1: signal.tp, tp2: signal.tp2 }, 'live');
 
     // Single arrow marker for the current live signal (replaces any previous)
     markers = [];
+    liveSignalTs = null;
     if (signal.last_bar) {
       const ts = Math.floor(new Date(signal.last_bar + (signal.last_bar.includes('Z') ? '' : 'Z')).getTime() / 1000);
+      liveSignalTs = ts;
       markers = [{
         time: ts,
         position: dir === 'BUY' ? 'belowBar' : 'aboveBar',
@@ -278,12 +279,14 @@ const ChartManager = (() => {
     historySignals = [];
     historyMarkers = [];
 
-    // Build markers — all history signals are circle dots
+    // Build markers — all history signals are circle dots, skip if same as live signal
     for (const s of signals) {
       if (!s.bar_time) continue;
       let isoTime = s.bar_time.replace(' ', 'T');
       if (!isoTime.includes('Z') && !isoTime.includes('+')) isoTime += 'Z';
       const ts = Math.floor(new Date(isoTime).getTime() / 1000);
+      // Skip if this is the same bar as the live signal
+      if (liveSignalTs && ts === liveSignalTs) continue;
       const dir = s.direction || '';
       const isPending = (s.outcome === null || s.outcome === undefined);
 
@@ -319,6 +322,7 @@ const ChartManager = (() => {
     historySignals = [];
     hasActiveSignal = false;
     expandedTs = null;
+    liveSignalTs = null;
     slLine = null; tp1Line = null; tp2Line = null; entryLine = null;
     histSlLine = null; histTp1Line = null; histTp2Line = null; histEntryLine = null;
     if (candleSeries) {
