@@ -88,13 +88,6 @@ const ChartManager = (() => {
       const tooltip = document.getElementById('signalTooltip');
       if (!tooltip) return;
 
-      // If live active signal is showing, don't expand history markers
-      if (hasActiveSignal) {
-        tooltip.style.display = 'none';
-        expandedTs = null;
-        return;
-      }
-
       if (!param.time || !param.point || historySignals.length === 0) {
         tooltip.style.display = 'none';
         expandedTs = null;
