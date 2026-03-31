@@ -47,6 +47,12 @@
   const detailH1     = $('detailH1');
   const detailRisk   = $('detailRisk');
   const historyBody  = $('historyBody');
+  const kpiSignals   = $('kpiSignals');
+  const kpiWR        = $('kpiWR');
+  const kpiTP        = $('kpiTP');
+  const kpiSL        = $('kpiSL');
+  const kpiPnL       = $('kpiPnL');
+  const kpiPending   = $('kpiPending');
 
   // ── Init ────────────────────────────────────────────────────────────
   function init() {
@@ -77,6 +83,7 @@
     clearInterval(candleTimer);
     clearInterval(historyTimer);
     // Fetch candles first, then signal + history — all guarded by switchId
+    fetchStats(mySwitch);
     fetchCandles(mySwitch).then(() => {
       if (switchId !== mySwitch) return;  // symbol changed while fetching
       fetchSignal(mySwitch);
@@ -147,6 +154,33 @@
       }
     } catch (err) {
       console.warn('History fetch error:', err.message);
+    }
+  }
+
+  // ── Fetch Daily Stats ──────────────────────────────────────────────
+  async function fetchStats(gen) {
+    try {
+      const sym = currentSymbol;
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/stats/daily?symbol=${sym}`);
+      if (gen !== undefined && gen !== switchId) return;
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (gen !== undefined && gen !== switchId) return;
+      const st = data[sym];
+      if (!st) return;
+      kpiSignals.textContent = st.total;
+      kpiWR.textContent = st.win_rate + '%';
+      kpiTP.textContent = st.tp;
+      kpiSL.textContent = st.sl;
+      kpiPnL.textContent = (st.pnl_pips >= 0 ? '+' : '') + st.pnl_pips;
+      kpiPending.textContent = st.pending;
+      // Color coding
+      const wrEl = kpiWR.parentElement;
+      wrEl.className = 'stats-kpi ' + (st.win_rate >= 50 ? 'kpi-wr-good' : 'kpi-wr-bad');
+      const pnlEl = kpiPnL.parentElement;
+      pnlEl.className = 'stats-kpi ' + (st.pnl_pips >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg');
+    } catch (err) {
+      console.warn('Stats fetch error:', err.message);
     }
   }
 

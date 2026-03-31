@@ -150,6 +150,44 @@ a:hover { color: #818cf8; }
 .sym-name { font-size: 0.85rem; font-weight: 600; font-family: var(--font-mono); }
 .sym-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
 
+/* ═══ DAILY STATS BANNER ═══ */
+.stats-banner { padding: 0 0 16px; }
+.stats-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.stats-kpi {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 18px;
+  text-align: center;
+  min-width: 90px;
+}
+.kpi-value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+.kpi-label {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+.kpi-green .kpi-value { color: var(--buy); }
+.kpi-red .kpi-value { color: var(--sell); }
+.kpi-wr-good .kpi-value { color: var(--buy); }
+.kpi-wr-bad .kpi-value { color: var(--sell); }
+.kpi-pnl-pos .kpi-value { color: var(--buy); }
+.kpi-pnl-neg .kpi-value { color: var(--sell); }
+
 /* ═══ DASHBOARD GRID ═══ */
 .dashboard { padding: 0 0 40px; }
 .dashboard-grid {
@@ -436,6 +474,8 @@ a:hover { color: #818cf8; }
   .history-table th, .history-table td { padding: 8px 6px; }
   .features-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
   .feature-card { padding: 16px; }
+  .stats-kpi { min-width: 70px; padding: 8px 10px; }
+  .kpi-value { font-size: 1rem; }
 }
 @media (max-width: 400px) {
   .features-grid { grid-template-columns: 1fr; }
