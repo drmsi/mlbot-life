@@ -6,16 +6,23 @@
 const ChartManager = (() => {
   let chart = null;
   let candleSeries = null;
+  // Live signal price lines
   let slLine = null;
   let tp1Line = null;
   let tp2Line = null;
   let entryLine = null;
+  // History signal price lines (for most recent pending)
+  let histSlLine = null;
+  let histTp1Line = null;
+  let histTp2Line = null;
+  let histEntryLine = null;
+
   let markers = [];
   let historyMarkers = [];
-  let historySignals = [];  // raw signal data for tooltip lookup
+  let historySignals = [];
   let currentSymbol = 'XAUUSD';
-  let hasActiveSignal = false;  // true when BUY/SELL price lines are drawn
-  let expandedTs = null;        // timestamp of currently expanded history marker
+  let hasActiveSignal = false;
+  let expandedTs = null;
 
   const PRICE_DECIMALS = {
     XAUUSD: 2, BTCUSD: 2, ETHUSD: 2, EURUSD: 5,
@@ -26,6 +33,10 @@ const ChartManager = (() => {
     XAUUSD: 0.01, BTCUSD: 0.01, ETHUSD: 0.01, EURUSD: 0.00001,
     GBPUSD: 0.00001, XAGUSD: 0.001, USDJPY: 0.001, BRENTCMDUSD: 0.01,
   };
+
+  // Bright glow colors for pending/active history signals
+  const GLOW_BUY  = '#86efac';  // bright green glow
+  const GLOW_SELL = '#fca5a5';  // bright red glow
 
   function init(containerId) {
     const container = document.getElementById(containerId);
@@ -77,7 +88,7 @@ const ChartManager = (() => {
       const tooltip = document.getElementById('signalTooltip');
       if (!tooltip) return;
 
-      // If active signal is showing, don't expand history markers
+      // If live active signal is showing, don't expand history markers
       if (hasActiveSignal) {
         tooltip.style.display = 'none';
         expandedTs = null;
@@ -90,7 +101,6 @@ const ChartManager = (() => {
         return;
       }
 
-      // Find if clicked time matches any history marker
       const match = historySignals.find(s => s._ts === param.time);
       if (!match) {
         tooltip.style.display = 'none';
@@ -123,7 +133,6 @@ const ChartManager = (() => {
         <div class="tt-row"><span>Model</span><span>${match.model || '--'}</span></div>
         ${match.exit_price != null ? `<div class="tt-row"><span>Exit</span><span>${match.exit_price.toFixed(dec)}</span></div>` : ''}
       `;
-      // Position tooltip near click point
       const chartRect = container.getBoundingClientRect();
       let left = param.point.x + chartRect.left + 16;
       let top = param.point.y + chartRect.top - 60;
@@ -146,16 +155,13 @@ const ChartManager = (() => {
 
   function setCandles(candles) {
     if (!candleSeries || !candles || candles.length === 0) return;
-    // Apply price format BEFORE setting data so axis renders correctly
     const dec = PRICE_DECIMALS[currentSymbol] || 2;
     const minMove = PRICE_MIN_MOVE[currentSymbol] || 0.01;
     candleSeries.applyOptions({
       priceFormat: { type: 'price', precision: dec, minMove: minMove },
     });
     candleSeries.setData(candles);
-    // Re-apply markers after setData (setData resets markers)
     _mergeAndSetMarkers();
-    // Reset both time and price scales to fit new symbol's data
     candleSeries.priceScale().applyOptions({ autoScale: true });
     chart.timeScale().fitContent();
   }
@@ -166,16 +172,62 @@ const ChartManager = (() => {
   }
 
   function clearSignalLines() {
-    // Safely remove price lines — try-catch each in case series state changed
     try { if (slLine)    { candleSeries.removePriceLine(slLine); } } catch(e) {}
     try { if (tp1Line)   { candleSeries.removePriceLine(tp1Line); } } catch(e) {}
     try { if (tp2Line)   { candleSeries.removePriceLine(tp2Line); } } catch(e) {}
     try { if (entryLine) { candleSeries.removePriceLine(entryLine); } } catch(e) {}
-    slLine = null;
-    tp1Line = null;
-    tp2Line = null;
-    entryLine = null;
+    slLine = null; tp1Line = null; tp2Line = null; entryLine = null;
     hasActiveSignal = false;
+  }
+
+  function _clearHistoryPriceLines() {
+    try { if (histSlLine)    { candleSeries.removePriceLine(histSlLine); } } catch(e) {}
+    try { if (histTp1Line)   { candleSeries.removePriceLine(histTp1Line); } } catch(e) {}
+    try { if (histTp2Line)   { candleSeries.removePriceLine(histTp2Line); } } catch(e) {}
+    try { if (histEntryLine) { candleSeries.removePriceLine(histEntryLine); } } catch(e) {}
+    histSlLine = null; histTp1Line = null; histTp2Line = null; histEntryLine = null;
+  }
+
+  function _drawPriceLines(sig, prefix) {
+    if (!candleSeries) return;
+    const dec = PRICE_DECIMALS[currentSymbol] || 2;
+    const isHist = (prefix === 'hist');
+    // Slightly dimmer style for history price lines
+    const entryColor = isHist ? '#818cf8' : '#6366f1';
+    const entryWidth = isHist ? 1 : 2;
+
+    if (sig.price != null) {
+      const line = candleSeries.createPriceLine({
+        price: sig.price, color: entryColor, lineWidth: entryWidth,
+        lineStyle: LightweightCharts.LineStyle.Solid,
+        axisLabelVisible: true, title: 'Entry ' + sig.price.toFixed(dec),
+      });
+      if (isHist) histEntryLine = line; else entryLine = line;
+    }
+    if (sig.sl != null) {
+      const line = candleSeries.createPriceLine({
+        price: sig.sl, color: '#ef4444', lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true, title: 'SL ' + sig.sl.toFixed(dec),
+      });
+      if (isHist) histSlLine = line; else slLine = line;
+    }
+    if (sig.tp1 != null) {
+      const line = candleSeries.createPriceLine({
+        price: sig.tp1, color: '#22c55e', lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true, title: 'TP1 ' + sig.tp1.toFixed(dec),
+      });
+      if (isHist) histTp1Line = line; else tp1Line = line;
+    }
+    if (sig.tp2 != null) {
+      const line = candleSeries.createPriceLine({
+        price: sig.tp2, color: '#86efac', lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted,
+        axisLabelVisible: true, title: 'TP2 ' + sig.tp2.toFixed(dec),
+      });
+      if (isHist) histTp2Line = line; else tp2Line = line;
+    }
   }
 
   function drawSignal(signal) {
@@ -183,62 +235,22 @@ const ChartManager = (() => {
     clearSignalLines();
 
     const dir = signal.signal;
-    if (dir !== 'BUY' && dir !== 'SELL') return;
+    if (dir !== 'BUY' && dir !== 'SELL') {
+      // No active live signal — let history draw its own price lines
+      return;
+    }
 
     hasActiveSignal = true;
-    // Close any expanded tooltip when active signal appears
+    // When live signal is active, remove history price lines (live takes priority)
+    _clearHistoryPriceLines();
     const tooltip = document.getElementById('signalTooltip');
     if (tooltip) tooltip.style.display = 'none';
     expandedTs = null;
 
-    const dec = PRICE_DECIMALS[currentSymbol] || 2;
-    const entryPrice = signal.price;
-    const slPrice = signal.sl;
-    const tp1Price = signal.tp;
-    const tp2Price = signal.tp2;
+    // Draw price lines for live signal
+    _drawPriceLines({ price: signal.price, sl: signal.sl, tp1: signal.tp, tp2: signal.tp2 }, 'live');
 
-    if (entryPrice) {
-      entryLine = candleSeries.createPriceLine({
-        price: entryPrice,
-        color: '#6366f1',
-        lineWidth: 2,
-        lineStyle: LightweightCharts.LineStyle.Solid,
-        axisLabelVisible: true,
-        title: 'Entry ' + entryPrice.toFixed(dec),
-      });
-    }
-    if (slPrice) {
-      slLine = candleSeries.createPriceLine({
-        price: slPrice,
-        color: '#ef4444',
-        lineWidth: 1,
-        lineStyle: LightweightCharts.LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: 'SL ' + slPrice.toFixed(dec),
-      });
-    }
-    if (tp1Price) {
-      tp1Line = candleSeries.createPriceLine({
-        price: tp1Price,
-        color: '#22c55e',
-        lineWidth: 1,
-        lineStyle: LightweightCharts.LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: 'TP1 ' + tp1Price.toFixed(dec),
-      });
-    }
-    if (tp2Price) {
-      tp2Line = candleSeries.createPriceLine({
-        price: tp2Price,
-        color: '#86efac',
-        lineWidth: 1,
-        lineStyle: LightweightCharts.LineStyle.Dotted,
-        axisLabelVisible: true,
-        title: 'TP2 ' + tp2Price.toFixed(dec),
-      });
-    }
-
-    // Add marker on the last candle
+    // Add arrow marker on the last candle
     if (signal.last_bar) {
       const ts = Math.floor(new Date(signal.last_bar + (signal.last_bar.includes('Z') ? '' : 'Z')).getTime() / 1000);
       const marker = {
@@ -255,31 +267,74 @@ const ChartManager = (() => {
   }
 
   function drawHistoryMarkers(signals) {
+    _clearHistoryPriceLines();
+
     if (!candleSeries || !signals || signals.length === 0) {
       historyMarkers = [];
       historySignals = [];
       _mergeAndSetMarkers();
       return;
     }
+
     historySignals = [];
     historyMarkers = [];
+
+    // Separate pending (still running) vs completed
+    const pending = [];
+    const completed = [];
+    for (const s of signals) {
+      if (!s.bar_time) continue;
+      if (s.outcome === null || s.outcome === undefined) {
+        pending.push(s);
+      } else {
+        completed.push(s);
+      }
+    }
+
+    // Most recent pending signal gets full price lines (if no live signal active)
+    const expandedPending = (!hasActiveSignal && pending.length > 0) ? pending[0] : null;
+
+    // Build markers for all signals
     for (const s of signals) {
       if (!s.bar_time) continue;
       let isoTime = s.bar_time.replace(' ', 'T');
       if (!isoTime.includes('Z') && !isoTime.includes('+')) isoTime += 'Z';
       const ts = Math.floor(new Date(isoTime).getTime() / 1000);
       const dir = s.direction || '';
-      const color = dir === 'BUY' ? '#22c55e' : '#ef4444';
+      const isPending = (s.outcome === null || s.outcome === undefined);
+      const isExpanded = (expandedPending && s === expandedPending);
+
+      let color, shape;
+      if (isExpanded) {
+        // Most recent pending — arrow marker (expanded with price lines)
+        color = dir === 'BUY' ? '#22c55e' : '#ef4444';
+        shape = dir === 'BUY' ? 'arrowUp' : 'arrowDown';
+      } else if (isPending) {
+        // Other pending — bright glow circle (still running)
+        color = dir === 'BUY' ? GLOW_BUY : GLOW_SELL;
+        shape = 'circle';
+      } else {
+        // Completed — regular dim circle
+        color = dir === 'BUY' ? '#22c55e' : '#ef4444';
+        shape = 'circle';
+      }
+
       historyMarkers.push({
         time: ts,
         position: dir === 'BUY' ? 'belowBar' : 'aboveBar',
         color: color,
-        shape: 'circle',
-        text: '',
+        shape: shape,
+        text: isPending && !isExpanded ? '\u25CF' : '',
       });
       historySignals.push({ ...s, _ts: ts });
     }
+
     _mergeAndSetMarkers();
+
+    // Draw price lines for the most recent pending signal
+    if (expandedPending) {
+      _drawPriceLines(expandedPending, 'hist');
+    }
   }
 
   function _mergeAndSetMarkers() {
@@ -290,9 +345,7 @@ const ChartManager = (() => {
     const sorted = Object.values(unique).sort((a, b) => a.time - b.time);
     try {
       candleSeries.setMarkers(sorted);
-    } catch(e) {
-      // Markers may reference times outside candle data range — safe to ignore
-    }
+    } catch(e) {}
   }
 
   function setSymbol(sym) {
@@ -302,11 +355,8 @@ const ChartManager = (() => {
     historySignals = [];
     hasActiveSignal = false;
     expandedTs = null;
-    // Null out line refs — setData([]) below will destroy them
-    slLine = null;
-    tp1Line = null;
-    tp2Line = null;
-    entryLine = null;
+    slLine = null; tp1Line = null; tp2Line = null; entryLine = null;
+    histSlLine = null; histTp1Line = null; histTp2Line = null; histEntryLine = null;
     if (candleSeries) {
       candleSeries.setData([]);
       candleSeries.setMarkers([]);
