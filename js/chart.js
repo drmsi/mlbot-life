@@ -93,6 +93,7 @@ const ChartManager = (() => {
       if (!param.time || !param.point || historySignals.length === 0) {
         tooltip.style.display = 'none';
         expandedTs = null;
+        _clearHistoryPriceLines();
         return;
       }
 
@@ -110,6 +111,7 @@ const ChartManager = (() => {
       if (!match) {
         tooltip.style.display = 'none';
         expandedTs = null;
+        _clearHistoryPriceLines();
         return;
       }
 
@@ -117,10 +119,16 @@ const ChartManager = (() => {
       if (expandedTs === match._ts) {
         tooltip.style.display = 'none';
         expandedTs = null;
+        _clearHistoryPriceLines();
         return;
       }
 
       expandedTs = match._ts;
+      // Redraw price lines for the clicked signal (clear previous history lines first)
+      _clearHistoryPriceLines();
+      if (!hasActiveSignal) {
+        _drawPriceLines({ price: match.price, sl: match.sl, tp1: match.tp1, tp2: match.tp2 }, 'hist');
+      }
       const dec = PRICE_DECIMALS[currentSymbol] || 2;
       const outcomeText = match.outcome || 'Pending';
       const outcomeClass = match.outcome === 'SL' ? 'sell'
@@ -271,9 +279,14 @@ const ChartManager = (() => {
   function drawHistoryMarkers(signals) {
     _clearHistoryPriceLines();
 
+    // Close tooltip on refresh
+    const tooltip = document.getElementById('signalTooltip');
+    if (tooltip) tooltip.style.display = 'none';
+
     if (!candleSeries || !signals || signals.length === 0) {
       historyMarkers = [];
       historySignals = [];
+      expandedTs = null;
       _mergeAndSetMarkers();
       return;
     }
@@ -281,26 +294,57 @@ const ChartManager = (() => {
     historySignals = [];
     historyMarkers = [];
 
-    // Build markers — all history signals are circle dots, skip if same as live signal
+    // Parse all history signals first
+    const parsed = [];
     for (const s of signals) {
       if (!s.bar_time) continue;
       let isoTime = s.bar_time.replace(' ', 'T');
       if (!isoTime.includes('Z') && !isoTime.includes('+')) isoTime += 'Z';
       const ts = Math.floor(new Date(isoTime).getTime() / 1000);
+      const dir = s.direction || '';
       // Skip if this is the same bar AND same direction as the live signal
       if (liveSignalTs && ts === liveSignalTs && dir === liveSignalDir) continue;
-      const dir = s.direction || '';
+      parsed.push({ sig: s, ts, dir });
+    }
+
+    // Find the latest (most recent) signal by timestamp
+    let latestTs = -Infinity;
+    for (const p of parsed) {
+      if (p.ts > latestTs) latestTs = p.ts;
+    }
+
+    // Build markers — latest signal gets arrow + auto-expand, rest get small circles
+    for (const p of parsed) {
+      const { sig: s, ts, dir } = p;
       const isPending = (s.outcome === null || s.outcome === undefined);
+      const isLatest = (ts === latestTs);
 
       historyMarkers.push({
         time: ts,
         position: dir === 'BUY' ? 'belowBar' : 'aboveBar',
         color: isPending ? (dir === 'BUY' ? GLOW_BUY : GLOW_SELL)
                          : (dir === 'BUY' ? '#22c55e' : '#ef4444'),
-        shape: 'circle',
-        text: '',
+        shape: isLatest ? 'arrowUp' : 'circle',
+        // Latest gets direction label, rest are blank
+        text: isLatest ? dir : '',
       });
+      // Fix arrow direction for SELL
+      if (isLatest && dir === 'SELL') {
+        historyMarkers[historyMarkers.length - 1].shape = 'arrowDown';
+      }
       historySignals.push({ ...s, _ts: ts });
+    }
+
+    // Auto-expand latest signal: draw its price lines (unless live signal is active)
+    if (!hasActiveSignal && latestTs > -Infinity) {
+      const latestSig = parsed.find(p => p.ts === latestTs);
+      if (latestSig) {
+        expandedTs = latestTs;
+        const s = latestSig.sig;
+        _drawPriceLines({ price: s.price, sl: s.sl, tp1: s.tp1, tp2: s.tp2 }, 'hist');
+      }
+    } else {
+      expandedTs = null;
     }
 
     _mergeAndSetMarkers();
