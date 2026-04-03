@@ -173,7 +173,7 @@
   async function fetchTradeHistory(gen) {
     try {
       const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/${sym}/history?limit=10`);
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/${sym}/history?limit=50&days=30`);
       if (gen !== undefined && gen !== switchId) return;  // stale
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -217,7 +217,7 @@
   async function fetchTradeStats(gen) {
     try {
       const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/daily-stats?symbol=${sym}&days=7`);
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/daily-stats?symbol=${sym}&days=30`);
       if (gen !== undefined && gen !== switchId) return;
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
