@@ -54,6 +54,13 @@
   const kpiSL        = $('kpiSL');
   const kpiPnL       = $('kpiPnL');
   const kpiPending   = $('kpiPending');
+  // Trade execution KPIs
+  const kpiPositions   = $('kpiPositions');
+  const kpiTradeWR     = $('kpiTradeWR');
+  const kpiTradeWins   = $('kpiTradeWins');
+  const kpiTradeLosses = $('kpiTradeLosses');
+  const kpiTradePnL    = $('kpiTradePnL');
+  const kpiAvgSlots    = $('kpiAvgSlots');
 
   // ── Init ────────────────────────────────────────────────────────────
   function init() {
@@ -86,6 +93,7 @@
     clearInterval(tradeTimer);
     // Fetch candles first, then signal + history + trades — all guarded by switchId
     fetchStats(mySwitch);
+    fetchTradeStats(mySwitch);
     fetchCandles(mySwitch).then(() => {
       if (switchId !== mySwitch) return;  // symbol changed while fetching
       fetchSignal(mySwitch);
@@ -95,7 +103,7 @@
     pollTimer    = setInterval(() => fetchSignal(switchId),  POLL_INTERVAL_MS);
     candleTimer  = setInterval(() => fetchCandles(switchId), CANDLE_POLL_MS);
     historyTimer = setInterval(() => fetchHistory(switchId), CANDLE_POLL_MS);
-    tradeTimer   = setInterval(() => fetchTradeHistory(switchId), CANDLE_POLL_MS);
+    tradeTimer   = setInterval(() => { fetchTradeHistory(switchId); fetchTradeStats(switchId); }, CANDLE_POLL_MS);
   }
 
   // ── Fetch Candles ───────────────────────────────────────────────────
@@ -202,6 +210,36 @@
       pnlEl.className = 'stats-kpi ' + (st.pnl_pips >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg');
     } catch (err) {
       console.warn('Stats fetch error:', err.message);
+    }
+  }
+
+  // ── Fetch Trade Stats ──────────────────────────────────────────────
+  async function fetchTradeStats(gen) {
+    try {
+      const sym = currentSymbol;
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/daily-stats?symbol=${sym}`);
+      if (gen !== undefined && gen !== switchId) return;
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (gen !== undefined && gen !== switchId) return;
+      const ts = data[sym];
+      if (!ts) return;
+      kpiPositions.textContent = ts.positions;
+      kpiTradeWR.textContent = ts.win_rate + '%';
+      kpiTradeWins.textContent = ts.wins;
+      kpiTradeLosses.textContent = ts.losses;
+      kpiTradePnL.textContent = (ts.net_pnl >= 0 ? '+$' : '-$') + Math.abs(ts.net_pnl).toFixed(2);
+      kpiAvgSlots.textContent = ts.avg_slots;
+      // Color coding
+      const wrEl = kpiTradeWR.parentElement;
+      wrEl.className = 'stats-kpi ' + (ts.win_rate >= 50 ? 'kpi-trade-wr-good' : 'kpi-trade-wr-bad');
+      const pnlEl = kpiTradePnL.parentElement;
+      pnlEl.className = 'stats-kpi ' + (ts.net_pnl >= 0 ? 'kpi-trade-pnl-pos' : 'kpi-trade-pnl-neg');
+      // Hide row if no positions
+      const row = $('tradeStatsRow');
+      if (row) row.style.display = ts.positions > 0 ? '' : 'none';
+    } catch (err) {
+      console.warn('Trade stats fetch error:', err.message);
     }
   }
 

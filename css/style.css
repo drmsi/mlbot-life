@@ -187,6 +187,12 @@ a:hover { color: #818cf8; }
 .kpi-wr-bad .kpi-value { color: var(--sell); }
 .kpi-pnl-pos .kpi-value { color: var(--buy); }
 .kpi-pnl-neg .kpi-value { color: var(--sell); }
+.stats-row-trades { margin-top: 8px; }
+.stats-row-trades .stats-kpi { border-color: rgba(59,130,246,0.25); }
+.kpi-trade-wr-good .kpi-value { color: var(--buy); }
+.kpi-trade-wr-bad .kpi-value { color: var(--sell); }
+.kpi-trade-pnl-pos .kpi-value { color: var(--buy); }
+.kpi-trade-pnl-neg .kpi-value { color: var(--sell); }
 
 /* ═══ DASHBOARD GRID ═══ */
 .dashboard { padding: 0 0 40px; }
