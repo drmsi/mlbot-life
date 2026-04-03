@@ -257,9 +257,9 @@
 
     const dec = getDecimals(currentSymbol);
     priceEntry.textContent = sig.price != null ? sig.price.toFixed(dec) : '--';
-    priceSL.textContent    = sig.sl != null    ? sig.sl.toFixed(dec) : '--';
-    priceTP1.textContent   = sig.tp != null    ? sig.tp.toFixed(dec) : '--';
-    priceTP2.textContent   = sig.tp2 != null   ? sig.tp2.toFixed(dec) : '--';
+    priceSL.textContent    = (sig.sl != null && sig.sl !== 0)  ? sig.sl.toFixed(dec)  : (dir !== 'HOLD' ? 'Trail' : '--');
+    priceTP1.textContent   = (sig.tp != null && sig.tp !== 0)  ? sig.tp.toFixed(dec)  : (dir !== 'HOLD' ? 'Trail' : '--');
+    priceTP2.textContent   = (sig.tp2 != null && sig.tp2 !== 0) ? sig.tp2.toFixed(dec) : (dir !== 'HOLD' ? 'Trail' : '--');
 
     // Probabilities
     const bp = (sig.buy_prob  || 0) * 100;
@@ -320,9 +320,9 @@
       symbol:   sig.symbol || currentSymbol,
       signal:   sig.signal,
       entry:    sig.price != null ? sig.price.toFixed(dec) : '--',
-      sl:       sig.sl != null ? sig.sl.toFixed(dec) : '--',
-      tp1:      sig.tp != null ? sig.tp.toFixed(dec) : '--',
-      tp2:      sig.tp2 != null ? sig.tp2.toFixed(dec) : '--',
+      sl:       (sig.sl != null && sig.sl !== 0)  ? sig.sl.toFixed(dec)  : 'Trail',
+      tp1:      (sig.tp != null && sig.tp !== 0)  ? sig.tp.toFixed(dec)  : 'Trail',
+      tp2:      (sig.tp2 != null && sig.tp2 !== 0) ? sig.tp2.toFixed(dec) : 'Trail',
       strength: sig.strength_label || '--',
     });
 
