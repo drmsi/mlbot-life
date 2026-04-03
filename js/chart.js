@@ -376,22 +376,29 @@ const ChartManager = (() => {
     const dec = PRICE_DECIMALS[currentSymbol] || 2;
     const dir = trade.direction === 1 ? 'BUY' : 'SELL';
     const dirClass = dir.toLowerCase();
-    const profitable = trade.net_profit >= 0;
+    const pnl = typeof trade.net_profit === 'number' ? trade.net_profit : 0;
+    const profitable = pnl >= 0;
     const pnlClass = profitable ? 'tt-pnl-buy' : 'tt-pnl-sell';
-    const pnlText = (profitable ? '+$' : '-$') + Math.abs(trade.net_profit).toFixed(2);
+    const pnlText = (profitable ? '+$' : '-$') + Math.abs(pnl).toFixed(2);
     const reason = trade.close_reason || '--';
     const isExit = trade._isExit;
+    const entryP = typeof trade.entry_price === 'number' ? trade.entry_price.toFixed(dec) : '--';
+    const exitP = typeof trade.exit_price === 'number' ? trade.exit_price.toFixed(dec) : '--';
 
     // Duration
     let duration = '--';
     if (trade.entry_time && trade.exit_time) {
-      let eIso = trade.entry_time.replace(' ', 'T');
-      if (!eIso.includes('Z') && !eIso.includes('+')) eIso += 'Z';
-      let xIso = trade.exit_time.replace(' ', 'T');
-      if (!xIso.includes('Z') && !xIso.includes('+')) xIso += 'Z';
-      const diffMs = new Date(xIso).getTime() - new Date(eIso).getTime();
-      const mins = Math.round(diffMs / 60000);
-      duration = mins >= 60 ? Math.round(mins / 60) + 'h ' + (mins % 60) + 'm' : mins + 'm';
+      try {
+        let eIso = trade.entry_time.replace(' ', 'T');
+        if (!eIso.includes('Z') && !eIso.includes('+')) eIso += 'Z';
+        let xIso = trade.exit_time.replace(' ', 'T');
+        if (!xIso.includes('Z') && !xIso.includes('+')) xIso += 'Z';
+        const diffMs = new Date(xIso).getTime() - new Date(eIso).getTime();
+        if (diffMs > 0 && diffMs < 86400000) {
+          const mins = Math.round(diffMs / 60000);
+          duration = mins >= 60 ? Math.round(mins / 60) + 'h ' + (mins % 60) + 'm' : mins + 'm';
+        }
+      } catch(e) {}
     }
 
     tooltip.innerHTML = `
@@ -400,9 +407,9 @@ const ChartManager = (() => {
         <span class="sig-badge trade-badge">TRADE</span>
         <span class="sig-badge ${profitable ? 'buy' : 'sell'}">${reason}</span>
       </div>
-      <div class="tt-row"><span>${isExit ? 'Exit' : 'Entry'}</span><span>${isExit ? trade.exit_price.toFixed(dec) : trade.entry_price.toFixed(dec)}</span></div>
+      <div class="tt-row"><span>${isExit ? 'Exit' : 'Entry'}</span><span>${isExit ? exitP : entryP}</span></div>
       <div class="tt-row"><span>P&L</span><span class="${pnlClass}">${pnlText}</span></div>
-      <div class="tt-row"><span>Lots</span><span>${trade.total_lots}</span></div>
+      <div class="tt-row"><span>Lots</span><span>${trade.total_lots || '--'}</span></div>
       <div class="tt-row"><span>Duration</span><span>${duration}</span></div>
       <div class="tt-row"><span>Slots</span><span>${trade.slots_filled || 1}</span></div>
       <div class="tt-row"><span>Mode</span><span>${trade.trade_mode || '--'}</span></div>
@@ -431,7 +438,10 @@ const ChartManager = (() => {
     for (const t of trades) {
       const dir = t.direction === 1 ? 'BUY' : 'SELL';
       const pos = dir === 'BUY' ? 'belowBar' : 'aboveBar';
-      const profitable = t.net_profit >= 0;
+      const pnl = typeof t.net_profit === 'number' ? t.net_profit : 0;
+      // Skip corrupt records (absurd values from data corruption)
+      if (Math.abs(pnl) > 1e6) continue;
+      const profitable = pnl >= 0;
 
       // Entry marker — blue square
       if (t.entry_time) {
@@ -453,14 +463,16 @@ const ChartManager = (() => {
         let iso = t.exit_time.replace(' ', 'T');
         if (!iso.includes('Z') && !iso.includes('+')) iso += 'Z';
         const exitTs = Math.floor(new Date(iso).getTime() / 1000);
-        const dec = PRICE_DECIMALS[currentSymbol] || 2;
-        const pnlText = (t.net_profit >= 0 ? '+' : '') + t.net_profit.toFixed(2);
+        // Clean format: whole dollars for chart labels
+        const absPnl = Math.abs(pnl);
+        const pnlLabel = absPnl >= 1 ? Math.round(absPnl) : absPnl.toFixed(2);
+        const pnlText = (profitable ? '+$' : '-$') + pnlLabel;
         tradeMarkers.push({
           time: exitTs,
           position: pos,
           color: profitable ? '#22c55e' : '#ef4444',
           shape: 'square',
-          text: '$' + pnlText,
+          text: pnlText,
         });
         tradeRecords.push({ ...t, _ts: exitTs, _isExit: true });
       }
