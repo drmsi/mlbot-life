@@ -217,7 +217,7 @@
   async function fetchTradeStats(gen) {
     try {
       const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/daily-stats?symbol=${sym}`);
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/daily-stats?symbol=${sym}&days=7`);
       if (gen !== undefined && gen !== switchId) return;
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
