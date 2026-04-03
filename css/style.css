@@ -353,6 +353,9 @@ a:hover { color: #818cf8; }
 .sig-badge.buy  { background: var(--buy-bg);  color: var(--buy); }
 .sig-badge.sell { background: var(--sell-bg); color: var(--sell); }
 .sig-badge.hold { background: var(--hold-bg); color: var(--hold); }
+.sig-badge.trade-badge { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.tt-pnl-buy  { color: var(--buy) !important; }
+.tt-pnl-sell { color: var(--sell) !important; }
 
 /* ═══ FEATURES ═══ */
 .features-section {

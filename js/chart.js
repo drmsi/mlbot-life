@@ -22,6 +22,8 @@ const ChartManager = (() => {
   let liveSignalDir = null;     // direction of current live signal ('BUY'/'SELL')
   let historyMarkers = [];
   let historySignals = [];
+  let tradeMarkers = [];
+  let tradeRecords = [];
   let currentSymbol = 'XAUUSD';
   let hasActiveSignal = false;
   let expandedTs = null;
@@ -90,15 +92,26 @@ const ChartManager = (() => {
       const tooltip = document.getElementById('signalTooltip');
       if (!tooltip) return;
 
-      if (!param.time || !param.point || historySignals.length === 0) {
+      if (!param.time || !param.point || (historySignals.length === 0 && tradeRecords.length === 0)) {
         tooltip.style.display = 'none';
         expandedTs = null;
         _clearHistoryPriceLines();
         return;
       }
 
-      // Find nearest history marker within 3 bars (900s for M5)
+      // Find nearest trade marker within 3 bars (900s for M5)
       const SNAP_SEC = 900;
+      let tradeMatch = null;
+      let tradeDist = Infinity;
+      for (const tr of tradeRecords) {
+        const dist = Math.abs(tr._ts - param.time);
+        if (dist < tradeDist && dist <= SNAP_SEC) {
+          tradeDist = dist;
+          tradeMatch = tr;
+        }
+      }
+
+      // Find nearest history marker within 3 bars
       let match = null;
       let bestDist = Infinity;
       for (const s of historySignals) {
@@ -108,6 +121,13 @@ const ChartManager = (() => {
           match = s;
         }
       }
+
+      // Trade marker takes priority if closer
+      if (tradeMatch && tradeDist <= bestDist) {
+        _showTradeTooltip(tradeMatch, param, container, tooltip);
+        return;
+      }
+
       if (!match) {
         tooltip.style.display = 'none';
         expandedTs = null;
@@ -350,15 +370,115 @@ const ChartManager = (() => {
     _mergeAndSetMarkers();
   }
 
+  function _showTradeTooltip(trade, param, container, tooltip) {
+    expandedTs = null;
+    _clearHistoryPriceLines();
+    const dec = PRICE_DECIMALS[currentSymbol] || 2;
+    const dir = trade.direction === 1 ? 'BUY' : 'SELL';
+    const dirClass = dir.toLowerCase();
+    const profitable = trade.net_profit >= 0;
+    const pnlClass = profitable ? 'tt-pnl-buy' : 'tt-pnl-sell';
+    const pnlText = (profitable ? '+$' : '-$') + Math.abs(trade.net_profit).toFixed(2);
+    const reason = trade.close_reason || '--';
+    const isExit = trade._isExit;
+
+    // Duration
+    let duration = '--';
+    if (trade.entry_time && trade.exit_time) {
+      let eIso = trade.entry_time.replace(' ', 'T');
+      if (!eIso.includes('Z') && !eIso.includes('+')) eIso += 'Z';
+      let xIso = trade.exit_time.replace(' ', 'T');
+      if (!xIso.includes('Z') && !xIso.includes('+')) xIso += 'Z';
+      const diffMs = new Date(xIso).getTime() - new Date(eIso).getTime();
+      const mins = Math.round(diffMs / 60000);
+      duration = mins >= 60 ? Math.round(mins / 60) + 'h ' + (mins % 60) + 'm' : mins + 'm';
+    }
+
+    tooltip.innerHTML = `
+      <div class="tt-header">
+        <span class="sig-badge ${dirClass}">${dir}</span>
+        <span class="sig-badge trade-badge">TRADE</span>
+        <span class="sig-badge ${profitable ? 'buy' : 'sell'}">${reason}</span>
+      </div>
+      <div class="tt-row"><span>${isExit ? 'Exit' : 'Entry'}</span><span>${isExit ? trade.exit_price.toFixed(dec) : trade.entry_price.toFixed(dec)}</span></div>
+      <div class="tt-row"><span>P&L</span><span class="${pnlClass}">${pnlText}</span></div>
+      <div class="tt-row"><span>Lots</span><span>${trade.total_lots}</span></div>
+      <div class="tt-row"><span>Duration</span><span>${duration}</span></div>
+      <div class="tt-row"><span>Slots</span><span>${trade.slots_filled || 1}</span></div>
+      <div class="tt-row"><span>Mode</span><span>${trade.trade_mode || '--'}</span></div>
+    `;
+    const chartRect = container.getBoundingClientRect();
+    let left = param.point.x + chartRect.left + 16;
+    let top = param.point.y + chartRect.top - 60;
+    if (left + 220 > window.innerWidth) left = param.point.x + chartRect.left - 230;
+    if (top < 0) top = 10;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+    tooltip.style.display = 'block';
+  }
+
+  function drawTradeMarkers(trades) {
+    if (!candleSeries || !trades || trades.length === 0) {
+      tradeMarkers = [];
+      tradeRecords = [];
+      _mergeAndSetMarkers();
+      return;
+    }
+
+    tradeMarkers = [];
+    tradeRecords = [];
+
+    for (const t of trades) {
+      const dir = t.direction === 1 ? 'BUY' : 'SELL';
+      const pos = dir === 'BUY' ? 'belowBar' : 'aboveBar';
+      const profitable = t.net_profit >= 0;
+
+      // Entry marker — blue square
+      if (t.entry_time) {
+        let iso = t.entry_time.replace(' ', 'T');
+        if (!iso.includes('Z') && !iso.includes('+')) iso += 'Z';
+        const entryTs = Math.floor(new Date(iso).getTime() / 1000);
+        tradeMarkers.push({
+          time: entryTs,
+          position: pos,
+          color: '#3b82f6',
+          shape: 'square',
+          text: '',
+        });
+        tradeRecords.push({ ...t, _ts: entryTs, _isExit: false });
+      }
+
+      // Exit marker — green if profit, red if loss
+      if (t.exit_time) {
+        let iso = t.exit_time.replace(' ', 'T');
+        if (!iso.includes('Z') && !iso.includes('+')) iso += 'Z';
+        const exitTs = Math.floor(new Date(iso).getTime() / 1000);
+        const dec = PRICE_DECIMALS[currentSymbol] || 2;
+        const pnlText = (t.net_profit >= 0 ? '+' : '') + t.net_profit.toFixed(2);
+        tradeMarkers.push({
+          time: exitTs,
+          position: pos,
+          color: profitable ? '#22c55e' : '#ef4444',
+          shape: 'square',
+          text: '$' + pnlText,
+        });
+        tradeRecords.push({ ...t, _ts: exitTs, _isExit: true });
+      }
+    }
+
+    _mergeAndSetMarkers();
+  }
+
   function _mergeAndSetMarkers() {
     if (!candleSeries) return;
-    const all = [...markers, ...historyMarkers];
+    const all = [...markers, ...historyMarkers, ...tradeMarkers];
     // Live arrows take precedence over history circles on same bar+position
     const arrowKeys = new Set();
     for (const m of all) {
       if (m.shape !== 'circle') arrowKeys.add(m.time + '_' + m.position);
     }
     const filtered = all.filter(m => {
+      // Only dedup circles vs arrows; squares (trades) always shown
       if (m.shape === 'circle' && arrowKeys.has(m.time + '_' + m.position)) return false;
       return true;
     });
@@ -373,6 +493,8 @@ const ChartManager = (() => {
     markers = [];
     historyMarkers = [];
     historySignals = [];
+    tradeMarkers = [];
+    tradeRecords = [];
     hasActiveSignal = false;
     expandedTs = null;
     liveSignalTs = null;
@@ -387,5 +509,5 @@ const ChartManager = (() => {
     if (tooltip) tooltip.style.display = 'none';
   }
 
-  return { init, setCandles, addCandle, drawSignal, drawHistoryMarkers, setSymbol, clearSignalLines };
+  return { init, setCandles, addCandle, drawSignal, drawHistoryMarkers, drawTradeMarkers, setSymbol, clearSignalLines };
 })();

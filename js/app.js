@@ -20,6 +20,7 @@
   let pollTimer     = null;
   let candleTimer   = null;
   let historyTimer  = null;
+  let tradeTimer    = null;
   let connected     = false;
 
   // ── DOM refs ────────────────────────────────────────────────────────
@@ -82,16 +83,19 @@
     clearInterval(pollTimer);
     clearInterval(candleTimer);
     clearInterval(historyTimer);
-    // Fetch candles first, then signal + history — all guarded by switchId
+    clearInterval(tradeTimer);
+    // Fetch candles first, then signal + history + trades — all guarded by switchId
     fetchStats(mySwitch);
     fetchCandles(mySwitch).then(() => {
       if (switchId !== mySwitch) return;  // symbol changed while fetching
       fetchSignal(mySwitch);
       fetchHistory(mySwitch);
+      fetchTradeHistory(mySwitch);
     });
     pollTimer    = setInterval(() => fetchSignal(switchId),  POLL_INTERVAL_MS);
     candleTimer  = setInterval(() => fetchCandles(switchId), CANDLE_POLL_MS);
     historyTimer = setInterval(() => fetchHistory(switchId), CANDLE_POLL_MS);
+    tradeTimer   = setInterval(() => fetchTradeHistory(switchId), CANDLE_POLL_MS);
   }
 
   // ── Fetch Candles ───────────────────────────────────────────────────
@@ -154,6 +158,23 @@
       }
     } catch (err) {
       console.warn('History fetch error:', err.message);
+    }
+  }
+
+  // ── Fetch Trade History ────────────────────────────────────────────
+  async function fetchTradeHistory(gen) {
+    try {
+      const sym = currentSymbol;
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/${sym}/history?limit=10`);
+      if (gen !== undefined && gen !== switchId) return;  // stale
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (gen !== undefined && gen !== switchId) return;  // stale
+      if (data.trades && data.trades.length > 0) {
+        ChartManager.drawTradeMarkers(data.trades);
+      }
+    } catch (err) {
+      console.warn('Trade history fetch error:', err.message);
     }
   }
 
