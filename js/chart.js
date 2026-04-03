@@ -407,12 +407,12 @@ const ChartManager = (() => {
         <span class="sig-badge trade-badge">TRADE</span>
         <span class="sig-badge ${profitable ? 'buy' : 'sell'}">${reason}</span>
       </div>
-      <div class="tt-row"><span>${isExit ? 'Exit' : 'Entry'}</span><span>${isExit ? exitP : entryP}</span></div>
+      <div class="tt-row"><span>Entry</span><span>${entryP}</span></div>
+      <div class="tt-row"><span>Exit</span><span>${exitP}</span></div>
       <div class="tt-row"><span>P&L</span><span class="${pnlClass}">${pnlText}</span></div>
       <div class="tt-row"><span>Lots</span><span>${trade.total_lots || '--'}</span></div>
-      <div class="tt-row"><span>Duration</span><span>${duration}</span></div>
       <div class="tt-row"><span>Slots</span><span>${trade.slots_filled || 1}</span></div>
-      <div class="tt-row"><span>Mode</span><span>${trade.trade_mode || '--'}</span></div>
+      <div class="tt-row"><span>Duration</span><span>${duration}</span></div>
     `;
     const chartRect = container.getBoundingClientRect();
     let left = param.point.x + chartRect.left + 16;
@@ -443,27 +443,11 @@ const ChartManager = (() => {
       if (Math.abs(pnl) > 1e6) continue;
       const profitable = pnl >= 0;
 
-      // Entry marker — blue square
-      if (t.entry_time) {
-        let iso = t.entry_time.replace(' ', 'T');
-        if (!iso.includes('Z') && !iso.includes('+')) iso += 'Z';
-        const entryTs = Math.floor(new Date(iso).getTime() / 1000);
-        tradeMarkers.push({
-          time: entryTs,
-          position: pos,
-          color: '#3b82f6',
-          shape: 'square',
-          text: '',
-        });
-        tradeRecords.push({ ...t, _ts: entryTs, _isExit: false });
-      }
-
-      // Exit marker — green if profit, red if loss
+      // Single marker per group at exit bar — green if profit, red if loss
       if (t.exit_time) {
         let iso = t.exit_time.replace(' ', 'T');
         if (!iso.includes('Z') && !iso.includes('+')) iso += 'Z';
         const exitTs = Math.floor(new Date(iso).getTime() / 1000);
-        // Clean format: whole dollars for chart labels
         const absPnl = Math.abs(pnl);
         const pnlLabel = absPnl >= 1 ? Math.round(absPnl) : absPnl.toFixed(2);
         const pnlText = (profitable ? '+$' : '-$') + pnlLabel;
