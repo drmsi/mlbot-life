@@ -520,11 +520,33 @@
       // Calculate timestamp for 30 days ago
       const thirtyDaysAgo = Math.floor((Date.now() / 1000) - (days * 24 * 60 * 60));
 
-      // Fetch a large number of signals (bridge will filter by time)
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals/${sym}/history?limit=500`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      if (!data.signals || data.signals.length === 0) {
+      // Fetch historical signals with reasonable limit
+      // Try different limits if 422 error occurs
+      let data = null;
+      let limit = 200;
+      const maxRetries = 3;
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const url = `${BRIDGE_URL}/v4/public/signals/${sym}/history?limit=${limit}`;
+        const resp = await fetch(url);
+
+        if (!resp.ok) {
+          SignalTracker.errorLog('BACKFILL_FETCH', `Attempt ${attempt + 1}: HTTP ${resp.status} for ${url}`, null);
+          if (resp.status === 422) {
+            // Try smaller limit on 422 error
+            limit = Math.floor(limit / 2);
+            SignalTracker.debugLog('BACKFILL_RETRY', `422 error, retrying with limit=${limit}`);
+            continue;
+          }
+          throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+        }
+
+        data = await resp.json();
+        SignalTracker.debugLog('BACKFILL_SUCCESS', `Successfully fetched ${url}`);
+        break;
+      }
+
+      if (!data || !data.signals || data.signals.length === 0) {
         SignalTracker.debugLog('BACKFILL', `No historical signals found for ${sym}`);
         return;
       }
