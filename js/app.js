@@ -23,6 +23,333 @@
   let tradeTimer    = null;
   let connected     = false;
 
+  // ── Signal Tracker Module ────────────────────────────────────────────
+  // Tracks original signal outcomes (TP1/TP2/SL hits) based on price action
+  const SignalTracker = (() => {
+    const MAX_TRACKED_SIGNALS = 200;
+    let trackedSignals = [];
+    let candleCache = new Map(); // symbol -> array of candles
+
+    function debugLog(category, message, data = null) {
+      const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+      const prefix = `[SignalTracker ${timestamp}]`;
+      console.log(`${prefix} [${category}] ${message}`, data ? data : '');
+    }
+
+    function errorLog(category, message, error = null) {
+      const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+      const prefix = `[SignalTracker ERROR ${timestamp}]`;
+      console.error(`${prefix} [${category}] ${message}`, error ? error : '');
+    }
+
+    function addSignal(sig) {
+      try {
+        if (!sig || (sig.signal !== 'BUY' && sig.signal !== 'SELL')) {
+          return null;
+        }
+
+        const signal = {
+          key: `${sig.last_bar}_${sig.symbol}_${sig.signal}`,
+          symbol: sig.symbol || currentSymbol,
+          direction: sig.signal,
+          entry: sig.price,
+          sl: sig.sl,
+          tp1: sig.tp,
+          tp2: sig.tp2,
+          bar_time: sig.last_bar,
+          model: sig.model_used,
+          atr: sig.atr,
+          tracked: false,
+          outcome: null, // 'TP1', 'TP2', 'SL', 'Pending'
+          outcome_bar: null,
+          checked_bars: 0,
+          max_check_bars: 100 // Maximum bars to check (500 minutes for M5)
+        };
+
+        // Deduplicate
+        if (trackedSignals.some(s => s.key === signal.key)) {
+          debugLog('DUPLICATE', `Signal already tracked: ${signal.key}`);
+          return null;
+        }
+
+        trackedSignals.unshift(signal);
+        if (trackedSignals.length > MAX_TRACKED_SIGNALS) {
+          trackedSignals = trackedSignals.slice(0, MAX_TRACKED_SIGNALS);
+        }
+
+        debugLog('ADD', `New signal tracked: ${signal.key}`, {
+          symbol: signal.symbol,
+          direction: signal.direction,
+          entry: signal.entry,
+          tp1: signal.tp1,
+          tp2: signal.tp2,
+          sl: signal.sl
+        });
+
+        // Save to localStorage for persistence
+        try {
+          localStorage.setItem('ddd_tracked_signals', JSON.stringify(trackedSignals.slice(0, 50)));
+        } catch (e) {
+          errorLog('STORAGE', 'Failed to save signals to localStorage', e);
+        }
+
+        return signal;
+      } catch (error) {
+        errorLog('ADD_SIGNAL', 'Error adding signal to tracker', error);
+        return null;
+      }
+    }
+
+    function updateCandles(symbol, candles) {
+      try {
+        if (!candles || candles.length === 0) {
+          return;
+        }
+
+        candleCache.set(symbol, candles);
+        debugLog('CANDLES', `Updated candle cache for ${symbol}: ${candles.length} candles`);
+
+        // Check pending signals after candles update
+        checkPendingSignals();
+      } catch (error) {
+        errorLog('CANDLES', `Error updating candles for ${symbol}`, error);
+      }
+    }
+
+    function checkPendingSignals() {
+      try {
+        const currentCandles = candleCache.get(currentSymbol);
+        if (!currentCandles || currentCandles.length === 0) {
+          return;
+        }
+
+        debugLog('CHECK', `Checking pending signals for ${currentSymbol}`);
+
+        for (const signal of trackedSignals) {
+          if (signal.symbol !== currentSymbol || signal.tracked) {
+            continue;
+          }
+
+          const result = checkSignalOutcome(signal, currentCandles);
+          if (result) {
+            signal.outcome = result.outcome;
+            signal.outcome_bar = result.bar_time;
+            signal.tracked = true;
+            debugLog('OUTCOME', `Signal ${signal.key} hit ${signal.outcome}`, {
+              entry: signal.entry,
+              outcome_bar: signal.outcome_bar
+            });
+          }
+
+          signal.checked_bars++;
+          if (signal.checked_bars >= signal.max_check_bars) {
+            signal.tracked = true;
+            signal.outcome = 'Pending (Expired)';
+            debugLog('EXPIRED', `Signal ${signal.key} expired without outcome`);
+          }
+        }
+
+        // Save updated signals
+        try {
+          localStorage.setItem('ddd_tracked_signals', JSON.stringify(trackedSignals.slice(0, 50)));
+        } catch (e) {
+          errorLog('STORAGE', 'Failed to save updated signals', e);
+        }
+      } catch (error) {
+        errorLog('CHECK', 'Error checking pending signals', error);
+      }
+    }
+
+    function checkSignalOutcome(signal, candles) {
+      try {
+        // Find the signal's candle
+        let signalCandleIndex = -1;
+        const signalTs = parseTime(signal.bar_time);
+
+        for (let i = 0; i < candles.length; i++) {
+          if (Math.abs(candles[i].time - signalTs) <= 300) { // Within 5 minutes
+            signalCandleIndex = i;
+            break;
+          }
+        }
+
+        if (signalCandleIndex === -1) {
+          debugLog('CHECK', `Signal candle not found for ${signal.key}`);
+          return null;
+        }
+
+        // Check candles after signal candle
+        for (let i = signalCandleIndex + 1; i < candles.length; i++) {
+          const candle = candles[i];
+
+          // For BUY signal
+          if (signal.direction === 'BUY') {
+            // Check SL first (stop loss takes priority)
+            if (signal.sl != null && signal.sl !== 0) {
+              if (candle.low <= signal.sl) {
+                debugLog('HIT_SL', `BUY signal hit SL at ${signal.sl}`, {
+                  candle_low: candle.low,
+                  bar_time: candle.time
+                });
+                return { outcome: 'SL', bar_time: candle.time };
+              }
+            }
+            // Check TP1
+            if (signal.tp1 != null && signal.tp1 !== 0) {
+              if (candle.high >= signal.tp1) {
+                debugLog('HIT_TP1', `BUY signal hit TP1 at ${signal.tp1}`, {
+                  candle_high: candle.high,
+                  bar_time: candle.time
+                });
+                // Continue checking for TP2
+                // Check TP2 in same or later candles
+                for (let j = i; j < candles.length; j++) {
+                  if (candles[j].high >= signal.tp2 && signal.tp2 != null && signal.tp2 !== 0) {
+                    debugLog('HIT_TP2', `BUY signal hit TP2 at ${signal.tp2}`, {
+                      candle_high: candles[j].high,
+                      bar_time: candles[j].time
+                    });
+                    return { outcome: 'TP2', bar_time: candles[j].time };
+                  }
+                }
+                return { outcome: 'TP1', bar_time: candle.time };
+              }
+            }
+          }
+          // For SELL signal
+          else if (signal.direction === 'SELL') {
+            // Check SL first
+            if (signal.sl != null && signal.sl !== 0) {
+              if (candle.high >= signal.sl) {
+                debugLog('HIT_SL', `SELL signal hit SL at ${signal.sl}`, {
+                  candle_high: candle.high,
+                  bar_time: candle.time
+                });
+                return { outcome: 'SL', bar_time: candle.time };
+              }
+            }
+            // Check TP1
+            if (signal.tp1 != null && signal.tp1 !== 0) {
+              if (candle.low <= signal.tp1) {
+                debugLog('HIT_TP1', `SELL signal hit TP1 at ${signal.tp1}`, {
+                  candle_low: candle.low,
+                  bar_time: candle.time
+                });
+                // Continue checking for TP2
+                for (let j = i; j < candles.length; j++) {
+                  if (candles[j].low <= signal.tp2 && signal.tp2 != null && signal.tp2 !== 0) {
+                    debugLog('HIT_TP2', `SELL signal hit TP2 at ${signal.tp2}`, {
+                      candle_low: candles[j].low,
+                      bar_time: candles[j].time
+                    });
+                    return { outcome: 'TP2', bar_time: candles[j].time };
+                  }
+                }
+                return { outcome: 'TP1', bar_time: candle.time };
+              }
+            }
+          }
+        }
+
+        return null;
+      } catch (error) {
+        errorLog('CHECK_OUTCOME', `Error checking outcome for signal ${signal.key}`, error);
+        return null;
+      }
+    }
+
+    function parseTime(timeStr) {
+      try {
+        let iso = timeStr.replace(' ', 'T');
+        if (!iso.includes('Z') && !iso.includes('+')) iso += 'Z';
+        return Math.floor(new Date(iso).getTime() / 1000);
+      } catch (error) {
+        errorLog('PARSE_TIME', `Error parsing time: ${timeStr}`, error);
+        return 0;
+      }
+    }
+
+    function getStats(symbol) {
+      try {
+        const symbolSignals = trackedSignals.filter(s =>
+          s.symbol === symbol && s.tracked && s.outcome && !s.outcome.includes('Pending')
+        );
+
+        const total = symbolSignals.length;
+        const tp1 = symbolSignals.filter(s => s.outcome === 'TP1').length;
+        const tp2 = symbolSignals.filter(s => s.outcome === 'TP2').length;
+        const sl = symbolSignals.filter(s => s.outcome === 'SL').length;
+        const wins = tp1 + tp2;
+        const winRate = total > 0 ? ((wins / total) * 100).toFixed(1) : 0;
+        const pending = trackedSignals.filter(s =>
+          s.symbol === symbol && !s.tracked
+        ).length;
+
+        debugLog('STATS', `Calculated stats for ${symbol}`, {
+          total,
+          wins,
+          tp1,
+          tp2,
+          sl,
+          winRate,
+          pending
+        });
+
+        return { total, tp: wins, sl, win_rate: parseFloat(winRate), pending };
+      } catch (error) {
+        errorLog('STATS', `Error calculating stats for ${symbol}`, error);
+        return { total: 0, tp: 0, sl: 0, win_rate: 0, pending: 0 };
+      }
+    }
+
+    function getHistory(symbol, limit = 20) {
+      try {
+        return trackedSignals
+          .filter(s => s.symbol === symbol)
+          .slice(0, limit);
+      } catch (error) {
+        errorLog('HISTORY', `Error getting history for ${symbol}`, error);
+        return [];
+      }
+    }
+
+    function loadFromStorage() {
+      try {
+        const stored = localStorage.getItem('ddd_tracked_signals');
+        if (stored) {
+          trackedSignals = JSON.parse(stored);
+          debugLog('LOAD', `Loaded ${trackedSignals.length} signals from storage`);
+        }
+      } catch (error) {
+        errorLog('LOAD', 'Error loading signals from storage', error);
+      }
+    }
+
+    function clear() {
+      trackedSignals = [];
+      candleCache.clear();
+      try {
+        localStorage.removeItem('ddd_tracked_signals');
+        debugLog('CLEAR', 'Cleared all tracked signals');
+      } catch (error) {
+        errorLog('CLEAR', 'Error clearing tracked signals', error);
+      }
+    }
+
+    // Initialize on load
+    loadFromStorage();
+
+    return {
+      addSignal,
+      updateCandles,
+      getStats,
+      getHistory,
+      clear,
+      debugLog,
+      errorLog
+    };
+  })();
+
   // ── DOM refs ────────────────────────────────────────────────────────
   const $  = id => document.getElementById(id);
   const statusDot    = $('statusDot');
@@ -117,10 +444,14 @@
       if (gen !== undefined && gen !== switchId) return;  // stale
       if (data.candles && data.candles.length > 0) {
         ChartManager.setCandles(data.candles);
+        // Update signal tracker with new candles
+        SignalTracker.updateCandles(sym, data.candles);
         setConnected(true);
       }
     } catch (err) {
-      console.warn('Candle fetch error:', err.message);
+      console.error('[fetchCandles] Error:', err.message);
+      SignalTracker.errorLog('FETCH_CANDLES', `Failed to fetch candles for ${currentSymbol}`, err);
+      setConnected(false);
     }
   }
 
@@ -139,6 +470,12 @@
         resetSignalPanel();
         return;
       }
+
+      // Add signal to tracker for outcome tracking
+      if (sig.signal === 'BUY' || sig.signal === 'SELL') {
+        SignalTracker.addSignal(sig);
+      }
+
       updateSignalPanel(sig);
       ChartManager.drawSignal(sig);
 
@@ -147,7 +484,8 @@
         addToHistory(sig);
       }
     } catch (err) {
-      console.warn('Signal fetch error:', err.message);
+      console.error('[fetchSignal] Error:', err.message);
+      SignalTracker.errorLog('FETCH_SIGNAL', `Failed to fetch signal for ${currentSymbol}`, err);
       setConnected(false);
     }
   }
@@ -190,26 +528,50 @@
   async function fetchStats(gen) {
     try {
       const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/stats/daily?symbol=${sym}`);
-      if (gen !== undefined && gen !== switchId) return;
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      if (gen !== undefined && gen !== switchId) return;
-      const st = data[sym];
-      if (!st) return;
-      kpiSignals.textContent = st.total;
-      kpiWR.textContent = st.win_rate + '%';
-      kpiTP.textContent = st.tp;
-      kpiSL.textContent = st.sl;
-      kpiPnL.textContent = (st.pnl_pips >= 0 ? '+' : '') + st.pnl_pips;
-      kpiPending.textContent = st.pending;
+
+      // Use tracked stats from SignalTracker for original signal outcomes
+      const trackedStats = SignalTracker.getStats(sym);
+
+      kpiSignals.textContent = trackedStats.total;
+      kpiWR.textContent = trackedStats.win_rate + '%';
+      kpiTP.textContent = trackedStats.tp;
+      kpiSL.textContent = trackedStats.sl;
+      kpiPending.textContent = trackedStats.pending;
+
+      // Calculate PnL based on tracked outcomes
+      let pnlPips = 0;
+      const history = SignalTracker.getHistory(sym, 100);
+      for (const sig of history) {
+        if (sig.outcome === 'TP1') {
+          const pipDiff = Math.abs(sig.tp1 - sig.entry);
+          pnlPips += sig.direction === 'BUY' ? pipDiff : -pipDiff;
+        } else if (sig.outcome === 'TP2') {
+          const pipDiff = Math.abs(sig.tp2 - sig.entry);
+          pnlPips += sig.direction === 'BUY' ? pipDiff : -pipDiff;
+        } else if (sig.outcome === 'SL') {
+          const pipDiff = Math.abs(sig.sl - sig.entry);
+          pnlPips += sig.direction === 'BUY' ? -pipDiff : pipDiff;
+        }
+      }
+      kpiPnL.textContent = (pnlPips >= 0 ? '+' : '') + pnlPips.toFixed(1);
+
       // Color coding
       const wrEl = kpiWR.parentElement;
-      wrEl.className = 'stats-kpi ' + (st.win_rate >= 50 ? 'kpi-wr-good' : 'kpi-wr-bad');
+      wrEl.className = 'stats-kpi ' + (trackedStats.win_rate >= 50 ? 'kpi-wr-good' : 'kpi-wr-bad');
       const pnlEl = kpiPnL.parentElement;
-      pnlEl.className = 'stats-kpi ' + (st.pnl_pips >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg');
+      pnlEl.className = 'stats-kpi ' + (pnlPips >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg');
+
+      SignalTracker.debugLog('STATS_UPDATE', `Updated stats for ${sym}`, {
+        total: trackedStats.total,
+        win_rate: trackedStats.win_rate,
+        tp: trackedStats.tp,
+        sl: trackedStats.sl,
+        pending: trackedStats.pending,
+        pnl_pips: pnlPips
+      });
     } catch (err) {
-      console.warn('Stats fetch error:', err.message);
+      console.error('[fetchStats] Error:', err.message);
+      SignalTracker.errorLog('FETCH_STATS', `Failed to fetch stats for ${currentSymbol}`, err);
     }
   }
 
@@ -314,6 +676,22 @@
     if (signalHistory.some(h => h.key === key)) return;
 
     const dec = getDecimals(sig.symbol || currentSymbol);
+
+    // Get outcome from SignalTracker if available
+    let outcome = 'Pending';
+    let outcomeClass = 'hold';
+
+    const tracked = SignalTracker.getHistory(sig.symbol || currentSymbol, MAX_HISTORY);
+    const trackedSig = tracked.find(s => s.key === key);
+    if (trackedSig && trackedSig.outcome) {
+      outcome = trackedSig.outcome;
+      if (outcome === 'SL') {
+        outcomeClass = 'sell';
+      } else if (outcome.startsWith('TP')) {
+        outcomeClass = 'buy';
+      }
+    }
+
     signalHistory.unshift({
       key,
       time:     sig.last_bar ? sig.last_bar.replace('T', ' ').substring(0, 16) : '--',
@@ -324,6 +702,8 @@
       tp1:      (sig.tp != null && sig.tp !== 0)  ? sig.tp.toFixed(dec)  : 'Trail',
       tp2:      (sig.tp2 != null && sig.tp2 !== 0) ? sig.tp2.toFixed(dec) : 'Trail',
       strength: sig.strength_label || '--',
+      outcome:  outcome,
+      outcomeClass: outcomeClass,
     });
 
     if (signalHistory.length > MAX_HISTORY) signalHistory = signalHistory.slice(0, MAX_HISTORY);
@@ -332,7 +712,7 @@
 
   function renderHistory() {
     if (signalHistory.length === 0) {
-      historyBody.innerHTML = '<tr class="empty-row"><td colspan="8">Waiting for signals...</td></tr>';
+      historyBody.innerHTML = '<tr class="empty-row"><td colspan="9">Waiting for signals...</td></tr>';
       return;
     }
     historyBody.innerHTML = signalHistory.map(h => `
@@ -344,6 +724,7 @@
         <td>${h.sl}</td>
         <td>${h.tp1}</td>
         <td>${h.tp2}</td>
+        <td><span class="sig-badge ${h.outcomeClass}">${h.outcome}</span></td>
         <td>${h.strength}</td>
       </tr>
     `).join('');
