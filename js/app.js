@@ -22,6 +22,7 @@
   let historyTimer  = null;
   let tradeTimer    = null;
   let connected     = false;
+  let backfilledSymbols = new Set(); // Track which symbols have been backfilled
 
   // ── Signal Tracker Module ────────────────────────────────────────────
   // Tracks original signal outcomes (TP1/TP2/SL hits) based on price action
@@ -317,8 +318,21 @@
       try {
         const stored = localStorage.getItem('ddd_tracked_signals');
         if (stored) {
-          trackedSignals = JSON.parse(stored);
-          debugLog('LOAD', `Loaded ${trackedSignals.length} signals from storage`);
+          const allSignals = JSON.parse(stored);
+
+          // Filter to last 30 days
+          const thirtyDaysAgo = Math.floor((Date.now() / 1000) - (30 * 24 * 60 * 60));
+          trackedSignals = allSignals.filter(s => {
+            const signalTs = parseTime(s.bar_time);
+            const isRecent = signalTs >= thirtyDaysAgo;
+            if (!isRecent) {
+              debugLog('LOAD_FILTER', `Filtered out old signal: ${s.key} (${s.bar_time})`);
+            }
+            return isRecent;
+          });
+
+          const filteredOut = allSignals.length - trackedSignals.length;
+          debugLog('LOAD', `Loaded ${trackedSignals.length} signals from storage (filtered out ${filteredOut} older than 30 days)`);
         }
       } catch (error) {
         errorLog('LOAD', 'Error loading signals from storage', error);
@@ -346,7 +360,8 @@
       getHistory,
       clear,
       debugLog,
-      errorLog
+      errorLog,
+      parseTime
     };
   })();
 
@@ -390,10 +405,10 @@
   const kpiAvgSlots    = $('kpiAvgSlots');
 
   // ── Init ────────────────────────────────────────────────────────────
-  function init() {
+  async function init() {
     ChartManager.init('chartContainer');
     bindSymbolButtons();
-    switchSymbol('XAUUSD');
+    await switchSymbol('XAUUSD');
   }
 
   function bindSymbolButtons() {
@@ -406,13 +421,21 @@
     });
   }
 
-  function switchSymbol(sym) {
+  async function switchSymbol(sym) {
     currentSymbol = sym;
     const mySwitch = ++switchId;  // capture switch generation
     chartSymbol.textContent = sym;
     chartLastBar.textContent = '--';
     ChartManager.setSymbol(sym);
     resetSignalPanel();
+
+    // Backfill historical signals on first visit to a symbol
+    if (!backfilledSymbols.has(sym)) {
+      backfilledSymbols.add(sym);
+      SignalTracker.debugLog('BACKFILL_INIT', `Starting backfill for ${sym}`);
+      await backfillSignalTracker(sym, 30);
+    }
+
     // Reset timers immediately
     clearInterval(pollTimer);
     clearInterval(candleTimer);
@@ -491,6 +514,73 @@
   }
 
   // ── Fetch History ──────────────────────────────────────────────────
+  // ── Backfill SignalTracker with Historical Signals ─────────────
+  async function backfillSignalTracker(sym, days = 30) {
+    try {
+      // Calculate timestamp for 30 days ago
+      const thirtyDaysAgo = Math.floor((Date.now() / 1000) - (days * 24 * 60 * 60));
+
+      // Fetch a large number of signals (bridge will filter by time)
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals/${sym}/history?limit=500`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (!data.signals || data.signals.length === 0) {
+        SignalTracker.debugLog('BACKFILL', `No historical signals found for ${sym}`);
+        return;
+      }
+
+      // Filter signals to last 30 days
+      const recentSignals = data.signals.filter(s => {
+        const signalTs = SignalTracker.parseTime(s.bar_time);
+        return signalTs >= thirtyDaysAgo;
+      });
+
+      if (recentSignals.length === 0) {
+        SignalTracker.debugLog('BACKFILL', `No signals in last ${days} days for ${sym}`);
+        return;
+      }
+
+      // Add historical signals to tracker
+      let addedCount = 0;
+      let skippedCount = 0;
+
+      for (const s of recentSignals) {
+        // Convert to signal format expected by SignalTracker
+        const signal = {
+          signal: s.direction, // BUY or SELL
+          price: s.entry,
+          sl: s.sl,
+          tp: s.tp1, // Bridge uses tp1, tracker uses tp
+          tp2: s.tp2,
+          last_bar: s.bar_time,
+          symbol: sym,
+          model_used: s.model || '--',
+          atr: s.atr || null
+        };
+
+        const added = SignalTracker.addSignal(signal);
+        if (added) {
+          addedCount++;
+        } else {
+          skippedCount++;
+        }
+      }
+
+      SignalTracker.debugLog('BACKFILL', `Backfilled ${addedCount}/${recentSignals.length} signals for ${sym} (last ${days} days)`, {
+        total_in_history: data.signals.length,
+        filtered_last_days: recentSignals.length,
+        added: addedCount,
+        skipped: skippedCount,
+        excluded_older_than: data.signals.length - recentSignals.length
+      });
+
+      // Update candles after backfill to check outcomes
+      fetchCandles();
+    } catch (err) {
+      SignalTracker.errorLog('BACKFILL', `Failed to backfill signals for ${sym}`, err);
+    }
+  }
+
   async function fetchHistory(gen) {
     try {
       const sym = currentSymbol;
