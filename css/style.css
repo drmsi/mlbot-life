@@ -118,37 +118,7 @@ a:hover { color: #818cf8; }
   margin-top: 4px;
 }
 
-/* ═══ SYMBOL BUTTONS ═══ */
-.symbols-section { padding: 24px 0; }
-.symbol-buttons {
-  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-}
-.sym-btn {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 2px; padding: 12px 16px; min-width: 85px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all .2s ease;
-  font-family: var(--font-main);
-}
-.sym-btn:hover {
-  border-color: var(--accent);
-  background: var(--bg-card-alt);
-  color: var(--text-primary);
-  transform: translateY(-2px);
-}
-.sym-btn.active {
-  border-color: var(--accent);
-  background: rgba(99,102,241,0.12);
-  color: var(--text-primary);
-  box-shadow: 0 0 20px var(--accent-glow);
-}
-.sym-icon { font-size: 1.2rem; }
-.sym-name { font-size: 0.85rem; font-weight: 600; font-family: var(--font-mono); }
-.sym-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+/* ═══ SYMBOL BUTTONS (removed — overview grid is the nav) ═══ */
 
 /* ═══ DAILY STATS BANNER ═══ */
 .stats-banner { padding: 0 0 16px; }
@@ -472,8 +442,6 @@ a:hover { color: #818cf8; }
 }
 @media (max-width: 600px) {
   .container { padding: 0 12px; }
-  .sym-btn { min-width: 70px; padding: 10px 10px; }
-  .sym-name { font-size: 0.75rem; }
   .chart-container { height: 300px; }
   .hero-stats { gap: 8px; }
   .stat-card { padding: 12px 16px; min-width: 70px; }
@@ -488,12 +456,10 @@ a:hover { color: #818cf8; }
 }
 @media (max-width: 400px) {
   .features-grid { grid-template-columns: 1fr; }
-  .symbol-buttons { gap: 6px; }
-  .sym-btn { min-width: 60px; padding: 8px 6px; }
 }
 
 /* ═══ OVERVIEW GRID ═══ */
-.overview-section { padding: 0 0 12px; }
+.overview-section { padding: 20px 0 12px; }
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

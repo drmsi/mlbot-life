@@ -445,18 +445,8 @@
   // ── Init ────────────────────────────────────────────────────────────
   async function init() {
     ChartManager.init('chartContainer');
-    bindSymbolButtons();
+    renderOverviewGrid(); // show empty grid immediately
     await switchSymbol('XAUUSD');
-  }
-
-  function bindSymbolButtons() {
-    document.querySelectorAll('.sym-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.sym-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        switchSymbol(btn.dataset.symbol);
-      });
-    });
   }
 
   async function switchSymbol(sym) {
@@ -590,9 +580,6 @@
 
   // Expose switchSymbol globally for overview grid onclick
   window._switchSym = function(sym) {
-    document.querySelectorAll('.sym-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.symbol === sym);
-    });
     switchSymbol(sym);
   };
 
