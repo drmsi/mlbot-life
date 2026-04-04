@@ -89,7 +89,7 @@
 
         // Save to localStorage for persistence
         try {
-          localStorage.setItem('ddd_tracked_signals', JSON.stringify(trackedSignals.slice(0, 50)));
+          localStorage.setItem('ddd_tracked_signals', JSON.stringify(trackedSignals.slice(0, MAX_TRACKED_SIGNALS)));
         } catch (e) {
           errorLog('STORAGE', 'Failed to save signals to localStorage', e);
         }
@@ -152,7 +152,7 @@
 
         // Save updated signals
         try {
-          localStorage.setItem('ddd_tracked_signals', JSON.stringify(trackedSignals.slice(0, 50)));
+          localStorage.setItem('ddd_tracked_signals', JSON.stringify(trackedSignals.slice(0, MAX_TRACKED_SIGNALS)));
         } catch (e) {
           errorLog('STORAGE', 'Failed to save updated signals', e);
         }
@@ -183,29 +183,18 @@
         for (let i = signalCandleIndex + 1; i < candles.length; i++) {
           const candle = candles[i];
 
-          // For BUY signal
+          // For BUY signal — check TP before SL (TP wins on same-bar touch)
           if (signal.direction === 'BUY') {
-            // Check SL first (stop loss takes priority)
-            if (signal.sl != null && signal.sl !== 0) {
-              if (candle.low <= signal.sl) {
-                debugLog('HIT_SL', `BUY signal hit SL at ${signal.sl}`, {
-                  candle_low: candle.low,
-                  bar_time: candle.time
-                });
-                return { outcome: 'SL', bar_time: candle.time };
-              }
-            }
-            // Check TP1
+            // Check TP1 first
             if (signal.tp1 != null && signal.tp1 !== 0) {
               if (candle.high >= signal.tp1) {
                 debugLog('HIT_TP1', `BUY signal hit TP1 at ${signal.tp1}`, {
                   candle_high: candle.high,
                   bar_time: candle.time
                 });
-                // Continue checking for TP2
-                // Check TP2 in same or later candles
+                // Continue checking for TP2 in same or later candles
                 for (let j = i; j < candles.length; j++) {
-                  if (candles[j].high >= signal.tp2 && signal.tp2 != null && signal.tp2 !== 0) {
+                  if (signal.tp2 != null && signal.tp2 !== 0 && candles[j].high >= signal.tp2) {
                     debugLog('HIT_TP2', `BUY signal hit TP2 at ${signal.tp2}`, {
                       candle_high: candles[j].high,
                       bar_time: candles[j].time
@@ -216,20 +205,20 @@
                 return { outcome: 'TP1', bar_time: candle.time };
               }
             }
-          }
-          // For SELL signal
-          else if (signal.direction === 'SELL') {
-            // Check SL first
+            // Check SL
             if (signal.sl != null && signal.sl !== 0) {
-              if (candle.high >= signal.sl) {
-                debugLog('HIT_SL', `SELL signal hit SL at ${signal.sl}`, {
-                  candle_high: candle.high,
+              if (candle.low <= signal.sl) {
+                debugLog('HIT_SL', `BUY signal hit SL at ${signal.sl}`, {
+                  candle_low: candle.low,
                   bar_time: candle.time
                 });
                 return { outcome: 'SL', bar_time: candle.time };
               }
             }
-            // Check TP1
+          }
+          // For SELL signal — check TP before SL
+          else if (signal.direction === 'SELL') {
+            // Check TP1 first
             if (signal.tp1 != null && signal.tp1 !== 0) {
               if (candle.low <= signal.tp1) {
                 debugLog('HIT_TP1', `SELL signal hit TP1 at ${signal.tp1}`, {
@@ -238,7 +227,7 @@
                 });
                 // Continue checking for TP2
                 for (let j = i; j < candles.length; j++) {
-                  if (candles[j].low <= signal.tp2 && signal.tp2 != null && signal.tp2 !== 0) {
+                  if (signal.tp2 != null && signal.tp2 !== 0 && candles[j].low <= signal.tp2) {
                     debugLog('HIT_TP2', `SELL signal hit TP2 at ${signal.tp2}`, {
                       candle_low: candles[j].low,
                       bar_time: candles[j].time
@@ -247,6 +236,16 @@
                   }
                 }
                 return { outcome: 'TP1', bar_time: candle.time };
+              }
+            }
+            // Check SL
+            if (signal.sl != null && signal.sl !== 0) {
+              if (candle.high >= signal.sl) {
+                debugLog('HIT_SL', `SELL signal hit SL at ${signal.sl}`, {
+                  candle_high: candle.high,
+                  bar_time: candle.time
+                });
+                return { outcome: 'SL', bar_time: candle.time };
               }
             }
           }
@@ -451,7 +450,7 @@
       fetchTradeHistory(mySwitch);
     });
     pollTimer    = setInterval(() => fetchSignal(switchId),  POLL_INTERVAL_MS);
-    candleTimer  = setInterval(() => fetchCandles(switchId), CANDLE_POLL_MS);
+    candleTimer  = setInterval(() => { fetchCandles(switchId); fetchStats(switchId); }, CANDLE_POLL_MS);
     historyTimer = setInterval(() => fetchHistory(switchId), CANDLE_POLL_MS);
     tradeTimer   = setInterval(() => { fetchTradeHistory(switchId); fetchTradeStats(switchId); }, CANDLE_POLL_MS);
   }
@@ -517,17 +516,17 @@
   // ── Backfill SignalTracker with Historical Signals ─────────────
   async function backfillSignalTracker(sym, days = 30) {
     try {
-      // Calculate timestamp for 30 days ago
-      const thirtyDaysAgo = Math.floor((Date.now() / 1000) - (days * 24 * 60 * 60));
+      // Calculate timestamp for N days ago
+      const cutoffTs = Math.floor((Date.now() / 1000) - (days * 24 * 60 * 60));
 
       // Fetch historical signals with reasonable limit
       // Try different limits if 422 error occurs
       let data = null;
-      let limit = 200;
+      let limit = 500;
       const maxRetries = 3;
 
       for (let attempt = 0; attempt < maxRetries; attempt++) {
-        const url = `${BRIDGE_URL}/v4/public/signals/${sym}/history?limit=${limit}`;
+        const url = `${BRIDGE_URL}/v4/public/signals/${sym}/history?limit=${limit}&days=${days}`;
         const resp = await fetch(url);
 
         if (!resp.ok) {
@@ -551,10 +550,10 @@
         return;
       }
 
-      // Filter signals to last 30 days
+      // Filter signals to requested days window
       const recentSignals = data.signals.filter(s => {
         const signalTs = SignalTracker.parseTime(s.bar_time);
-        return signalTs >= thirtyDaysAgo;
+        return signalTs >= cutoffTs;
       });
 
       if (recentSignals.length === 0) {
@@ -570,7 +569,7 @@
         // Convert to signal format expected by SignalTracker
         const signal = {
           signal: s.direction, // BUY or SELL
-          price: s.entry,
+          price: s.price,
           sl: s.sl,
           tp: s.tp1, // Bridge uses tp1, tracker uses tp
           tp2: s.tp2,
@@ -650,22 +649,23 @@
       kpiSL.textContent = trackedStats.sl;
       kpiPending.textContent = trackedStats.pending;
 
-      // Calculate PnL based on tracked outcomes
+      // Calculate PnL in pips based on tracked outcomes
       let pnlPips = 0;
-      const history = SignalTracker.getHistory(sym, 100);
+      const pipSize = getPipSize(sym);
+      const history = SignalTracker.getHistory(sym, 500);
       for (const sig of history) {
-        if (sig.outcome === 'TP1') {
-          const pipDiff = Math.abs(sig.tp1 - sig.entry);
-          pnlPips += sig.direction === 'BUY' ? pipDiff : -pipDiff;
-        } else if (sig.outcome === 'TP2') {
-          const pipDiff = Math.abs(sig.tp2 - sig.entry);
-          pnlPips += sig.direction === 'BUY' ? pipDiff : -pipDiff;
-        } else if (sig.outcome === 'SL') {
-          const pipDiff = Math.abs(sig.sl - sig.entry);
-          pnlPips += sig.direction === 'BUY' ? -pipDiff : pipDiff;
+        if (!sig.tracked || !sig.outcome || sig.outcome.includes('Pending')) continue;
+        const entry = sig.entry;
+        if (!entry || !pipSize) continue;
+        if (sig.outcome === 'TP1' && sig.tp1) {
+          pnlPips += (sig.direction === 'BUY' ? sig.tp1 - entry : entry - sig.tp1) / pipSize;
+        } else if (sig.outcome === 'TP2' && sig.tp2) {
+          pnlPips += (sig.direction === 'BUY' ? sig.tp2 - entry : entry - sig.tp2) / pipSize;
+        } else if (sig.outcome === 'SL' && sig.sl) {
+          pnlPips += (sig.direction === 'BUY' ? sig.sl - entry : entry - sig.sl) / pipSize;
         }
       }
-      kpiPnL.textContent = (pnlPips >= 0 ? '+' : '') + pnlPips.toFixed(1);
+      kpiPnL.textContent = (pnlPips >= 0 ? '+' : '') + Math.round(pnlPips).toFixed(0);
 
       // Color coding
       const wrEl = kpiWR.parentElement;
@@ -861,6 +861,15 @@
       GBPUSD: 5, XAGUSD: 3, USDJPY: 3, BRENTCMDUSD: 2,
     };
     return map[sym] || 2;
+  }
+
+  // Pip size per symbol (1 pip in price units)
+  function getPipSize(sym) {
+    const map = {
+      XAUUSD: 0.1, BTCUSD: 1.0, ETHUSD: 0.1, EURUSD: 0.0001,
+      GBPUSD: 0.0001, XAGUSD: 0.001, USDJPY: 0.01, BRENTCMDUSD: 0.01,
+    };
+    return map[sym] || 0.0001;
   }
 
   function formatAge(seconds) {
