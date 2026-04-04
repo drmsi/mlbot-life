@@ -21,8 +21,13 @@
   let candleTimer   = null;
   let historyTimer  = null;
   let tradeTimer    = null;
+  let sparkTimer    = null;
   let connected     = false;
   let backfilledSymbols = new Set(); // Track which symbols have been backfilled
+  let allSignalsCache = {};          // Latest signals for all symbols (from /v4/public/signals)
+  let sparklineCache  = {};          // 7-day PnL data keyed by symbol
+  let errorHistory    = [];          // Last 5 errors
+  let errorPanelOpen  = false;
 
   // ── Signal Tracker Module ────────────────────────────────────────────
   // Tracks original signal outcomes (TP1/TP2/SL hits) based on price action
@@ -364,6 +369,34 @@
     };
   })();
 
+  // ── Error Logging ────────────────────────────────────────────────────
+  function logError(source, message) {
+    const ts = new Date().toLocaleTimeString();
+    errorHistory.unshift({ ts, source, message });
+    if (errorHistory.length > 5) errorHistory.length = 5;
+    renderErrorPanel();
+  }
+
+  function renderErrorPanel() {
+    const panel = document.getElementById('errorPanel');
+    const body  = document.getElementById('errorLogBody');
+    const count = document.getElementById('errorCount');
+    if (!panel || !body || !count) return;
+    if (errorHistory.length === 0) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    count.textContent = errorHistory.length;
+    body.style.display = errorPanelOpen ? '' : 'none';
+    body.innerHTML = errorHistory.map(e =>
+      `<div class="error-log-item"><span class="err-time">${e.ts}</span><span class="err-src">[${e.source}]</span><span class="err-msg">${e.msg || e.message}</span></div>`
+    ).join('');
+  }
+
+  // exposed globally for onclick in HTML
+  window.toggleErrorPanel = function() {
+    errorPanelOpen = !errorPanelOpen;
+    renderErrorPanel();
+  };
+
   // ── DOM refs ────────────────────────────────────────────────────────
   const $  = id => document.getElementById(id);
   const statusDot    = $('statusDot');
@@ -401,7 +434,13 @@
   const kpiTradeWins   = $('kpiTradeWins');
   const kpiTradeLosses = $('kpiTradeLosses');
   const kpiTradePnL    = $('kpiTradePnL');
+  const kpiTradePF     = $('kpiTradePF');
   const kpiAvgSlots    = $('kpiAvgSlots');
+  // New fields
+  const signalReasonWrap = $('signalReasonWrap');
+  const signalReason     = $('signalReason');
+  const detailAlloc      = $('detailAlloc');
+  const statsErrorBadge  = $('statsErrorBadge');
 
   // ── Init ────────────────────────────────────────────────────────────
   async function init() {
@@ -440,9 +479,14 @@
     clearInterval(candleTimer);
     clearInterval(historyTimer);
     clearInterval(tradeTimer);
+    clearInterval(sparkTimer);
     // Fetch candles first, then signal + history + trades — all guarded by switchId
     fetchStats(mySwitch);
     fetchTradeStats(mySwitch);
+    fetchTradeSummary(mySwitch);
+    fetchSparklineData(sym).then(data => {
+      if (switchId === mySwitch) renderSparkline(data);
+    });
     fetchCandles(mySwitch).then(() => {
       if (switchId !== mySwitch) return;  // symbol changed while fetching
       fetchSignal(mySwitch);
@@ -452,7 +496,10 @@
     pollTimer    = setInterval(() => fetchSignal(switchId),  POLL_INTERVAL_MS);
     candleTimer  = setInterval(() => { fetchCandles(switchId); fetchStats(switchId); }, CANDLE_POLL_MS);
     historyTimer = setInterval(() => fetchHistory(switchId), CANDLE_POLL_MS);
-    tradeTimer   = setInterval(() => { fetchTradeHistory(switchId); fetchTradeStats(switchId); }, CANDLE_POLL_MS);
+    tradeTimer   = setInterval(() => { fetchTradeHistory(switchId); fetchTradeStats(switchId); fetchTradeSummary(switchId); }, CANDLE_POLL_MS);
+    sparkTimer   = setInterval(() => {
+      fetchSparklineData(currentSymbol).then(data => { if (switchId !== undefined) renderSparkline(data); });
+    }, 5 * 60 * 1000); // refresh sparkline every 5 min
   }
 
   // ── Fetch Candles ───────────────────────────────────────────────────
@@ -487,6 +534,10 @@
       if (gen !== undefined && gen !== switchId) return;  // stale
       setConnected(true);
 
+      // Cache all symbols data + update overview grid
+      allSignalsCache = data;
+      renderOverviewGrid();
+
       const sig = data[currentSymbol];
       if (!sig) {
         resetSignalPanel();
@@ -508,9 +559,42 @@
     } catch (err) {
       console.error('[fetchSignal] Error:', err.message);
       SignalTracker.errorLog('FETCH_SIGNAL', `Failed to fetch signal for ${currentSymbol}`, err);
+      logError('Signal', 'Bridge unreachable — ' + err.message);
       setConnected(false);
     }
   }
+
+  // ── Overview Grid ────────────────────────────────────────────────────
+  function renderOverviewGrid() {
+    const grid = $('overviewGrid');
+    if (!grid) return;
+    const symbols = ['XAUUSD','BTCUSD','EURUSD','ETHUSD','GBPUSD','XAGUSD','USDJPY','BRENTCMDUSD'];
+    const names   = {XAUUSD:'Gold',BTCUSD:'BTC',EURUSD:'EUR',ETHUSD:'ETH',GBPUSD:'GBP',XAGUSD:'Silver',USDJPY:'JPY',BRENTCMDUSD:'Brent'};
+    grid.innerHTML = symbols.map(sym => {
+      const sig = allSignalsCache[sym];
+      const dir = sig ? (sig.signal || 'HOLD') : '?';
+      const dec = getDecimals(sym);
+      const price = sig && sig.price != null ? sig.price.toFixed(dec) : '--';
+      const alloc = sig && sig.capital_allocation_pct != null ? sig.capital_allocation_pct.toFixed(0) + '%' : '--';
+      const isActive = sym === currentSymbol;
+      return `<div class="ov-card${isActive ? ' active' : ''}" data-sym="${sym}" onclick="window._switchSym('${sym}')">
+        <div class="ov-sym">${sym === 'BRENTCMDUSD' ? 'BRENT' : sym}</div>
+        <div class="ov-row">
+          <span class="ov-badge ${dir.toLowerCase()}">${dir}</span>
+          <span class="ov-alloc">${alloc}</span>
+        </div>
+        <div class="ov-price">${price}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Expose switchSymbol globally for overview grid onclick
+  window._switchSym = function(sym) {
+    document.querySelectorAll('.sym-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.symbol === sym);
+    });
+    switchSymbol(sym);
+  };
 
   // ── Fetch History ──────────────────────────────────────────────────
   // ── Backfill SignalTracker with Historical Signals ─────────────
@@ -615,6 +699,9 @@
       }
     } catch (err) {
       console.warn('History fetch error:', err.message);
+      if (historyBody && historyBody.innerHTML.includes('Waiting')) {
+        historyBody.innerHTML = '<tr class="error-row"><td colspan="9">⚠ History unavailable — ' + err.message + '</td></tr>';
+      }
     }
   }
 
@@ -637,10 +724,43 @@
 
   // ── Fetch Daily Stats ──────────────────────────────────────────────
   async function fetchStats(gen) {
-    try {
-      const sym = currentSymbol;
+    const sym = currentSymbol;
 
-      // Use tracked stats from SignalTracker for original signal outcomes
+    // Try server-side stats first (reliable, persists across sessions)
+    let serverStats = null;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/stats/daily?symbol=${sym}&dt=${today}`);
+      if (gen !== undefined && gen !== switchId) return;
+      if (resp.ok) {
+        const data = await resp.json();
+        serverStats = data[sym];
+      }
+    } catch (err) {
+      // fall through to SignalTracker
+    }
+    if (gen !== undefined && gen !== switchId) return;
+
+    if (serverStats && serverStats.total > 0) {
+      // Server-side data available — use it
+      kpiSignals.textContent = serverStats.total;
+      kpiWR.textContent = serverStats.win_rate + '%';
+      kpiTP.textContent = serverStats.tp;
+      kpiSL.textContent = serverStats.sl;
+      kpiPending.textContent = serverStats.pending;
+      kpiPnL.textContent = (serverStats.pnl_pips >= 0 ? '+' : '') + serverStats.pnl_pips.toFixed(0);
+
+      const wrEl = kpiWR.parentElement;
+      wrEl.className = 'stats-kpi ' + (serverStats.win_rate >= 50 ? 'kpi-wr-good' : 'kpi-wr-bad');
+      const pnlEl = kpiPnL.parentElement;
+      pnlEl.className = 'stats-kpi ' + (serverStats.pnl_pips >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg');
+
+      if (statsErrorBadge) statsErrorBadge.style.display = 'none';
+      return;
+    }
+
+    // Fallback: client-side SignalTracker
+    try {
       const trackedStats = SignalTracker.getStats(sym);
 
       kpiSignals.textContent = trackedStats.total;
@@ -667,23 +787,27 @@
       }
       kpiPnL.textContent = (pnlPips >= 0 ? '+' : '') + Math.round(pnlPips).toFixed(0);
 
-      // Color coding
       const wrEl = kpiWR.parentElement;
       wrEl.className = 'stats-kpi ' + (trackedStats.win_rate >= 50 ? 'kpi-wr-good' : 'kpi-wr-bad');
       const pnlEl = kpiPnL.parentElement;
       pnlEl.className = 'stats-kpi ' + (pnlPips >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg');
 
-      SignalTracker.debugLog('STATS_UPDATE', `Updated stats for ${sym}`, {
-        total: trackedStats.total,
-        win_rate: trackedStats.win_rate,
-        tp: trackedStats.tp,
-        sl: trackedStats.sl,
-        pending: trackedStats.pending,
-        pnl_pips: pnlPips
-      });
+      if (statsErrorBadge) {
+        if (trackedStats.total === 0) {
+          statsErrorBadge.style.display = '';
+          statsErrorBadge.textContent = '⚠ Stats unavailable (no server data for today)';
+        } else {
+          statsErrorBadge.style.display = 'none';
+        }
+      }
     } catch (err) {
       console.error('[fetchStats] Error:', err.message);
       SignalTracker.errorLog('FETCH_STATS', `Failed to fetch stats for ${currentSymbol}`, err);
+      if (statsErrorBadge) {
+        statsErrorBadge.style.display = '';
+        statsErrorBadge.textContent = '⚠ Stats unavailable';
+      }
+      logError('Stats', err.message);
     }
   }
 
@@ -717,6 +841,87 @@
     }
   }
 
+  // ── Fetch Trade Summary (PF + close reasons) ───────────────────────
+  async function fetchTradeSummary(gen) {
+    try {
+      const sym = currentSymbol;
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/${sym}/summary?days=30`);
+      if (gen !== undefined && gen !== switchId) return;
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (gen !== undefined && gen !== switchId) return;
+      const stats = data.stats || {};
+      if (kpiTradePF) {
+        const pf = stats.profit_factor ?? stats.pf;
+        kpiTradePF.textContent = pf != null ? pf.toFixed(2) : '--';
+      }
+    } catch (err) {
+      // Trade summary not critical — skip silently (EA may not be reporting yet)
+    }
+  }
+
+  // ── 7-Day Sparkline ─────────────────────────────────────────────────
+  async function fetchSparklineData(sym) {
+    if (sparklineCache[sym]) return sparklineCache[sym];
+    const data = [];
+    const now = new Date();
+    const fetches = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dt = d.toISOString().split('T')[0];
+      fetches.push(
+        fetch(`${BRIDGE_URL}/v4/public/stats/daily?symbol=${sym}&dt=${dt}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(json => json && json[sym] ? json[sym].pnl_pips || 0 : 0)
+          .catch(() => 0)
+      );
+    }
+    const results = await Promise.all(fetches);
+    sparklineCache[sym] = results;
+    return results;
+  }
+
+  function renderSparkline(data) {
+    const svg = $('pnlSparkline');
+    const wrap = $('sparklineWrap');
+    if (!svg || !wrap) return;
+
+    // Hide if all zeros
+    if (!data || data.every(v => v === 0)) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+
+    const W = 100, H = 36, pad = 4;
+    const cumulativePnL = [];
+    let running = 0;
+    for (const v of data) { running += v; cumulativePnL.push(running); }
+
+    const minV = Math.min(...cumulativePnL);
+    const maxV = Math.max(...cumulativePnL);
+    const range = maxV - minV || 1;
+    const n = cumulativePnL.length;
+
+    const pts = cumulativePnL.map((v, i) => {
+      const x = pad + (i / (n - 1)) * (W - 2 * pad);
+      const y = (H - pad) - ((v - minV) / range) * (H - 2 * pad);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+
+    const lastVal = cumulativePnL[cumulativePnL.length - 1];
+    const color = lastVal >= 0 ? '#22c55e' : '#ef4444';
+    const [lx, ly] = pts[pts.length - 1].split(',');
+    // Zero line
+    const zeroY = (H - pad) - ((0 - minV) / range) * (H - 2 * pad);
+    const zeroLine = minV < 0 && maxV > 0
+      ? `<line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${W - pad}" y2="${zeroY.toFixed(1)}" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="2,2"/>`
+      : '';
+    svg.innerHTML = `
+      ${zeroLine}
+      <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${lx}" cy="${ly}" r="2.5" fill="${color}"/>
+    `;
+  }
+
   // ── Update Signal Panel ─────────────────────────────────────────────
   function updateSignalPanel(sig) {
     const dir = sig.signal || 'HOLD';
@@ -725,9 +930,30 @@
 
     sigStr.textContent = sig.strength_bars || '';
     sigModel.textContent = sig.model_used || '--';
-    sigAge.textContent = sig.signal_age_sec != null
-      ? formatAge(sig.signal_age_sec) + ' ago'
-      : '--';
+
+    // Age with color coding
+    const ageSec = sig.signal_age_sec;
+    if (ageSec != null) {
+      sigAge.textContent = formatAge(ageSec) + ' ago';
+      let ageClass = 'age-fresh';
+      if (ageSec > 900) ageClass = 'age-stale';
+      else if (ageSec > 300) ageClass = 'age-aging';
+      sigAge.className = 'signal-age ' + ageClass;
+    } else {
+      sigAge.textContent = '--';
+      sigAge.className = 'signal-age';
+    }
+
+    // Signal reason (especially useful for HOLD)
+    if (signalReasonWrap && signalReason) {
+      const reason = sig.reason || '';
+      if (reason) {
+        signalReason.textContent = reason;
+        signalReasonWrap.style.display = '';
+      } else {
+        signalReasonWrap.style.display = 'none';
+      }
+    }
 
     const dec = getDecimals(currentSymbol);
     priceEntry.textContent = sig.price != null ? sig.price.toFixed(dec) : '--';
@@ -751,6 +977,11 @@
     detailRegime.textContent = sig.regime_label || '--';
     detailH1.textContent     = sig.h1_confluence || '--';
     detailRisk.textContent   = sig.risk_multiplier != null ? sig.risk_multiplier + 'x' : '--';
+    if (detailAlloc) {
+      detailAlloc.textContent = sig.capital_allocation_pct != null
+        ? sig.capital_allocation_pct.toFixed(0) + '%'
+        : '--';
+    }
 
     // Last bar
     if (sig.last_bar) {
@@ -764,6 +995,7 @@
     sigStr.textContent = '';
     sigModel.textContent = '--';
     sigAge.textContent = '--';
+    sigAge.className = 'signal-age';
     priceEntry.textContent = '--';
     priceSL.textContent = '--';
     priceTP1.textContent = '--';
@@ -778,6 +1010,8 @@
     detailRegime.textContent = '--';
     detailH1.textContent = '--';
     detailRisk.textContent = '--';
+    if (detailAlloc) detailAlloc.textContent = '--';
+    if (signalReasonWrap) signalReasonWrap.style.display = 'none';
     ChartManager.clearSignalLines();
   }
 

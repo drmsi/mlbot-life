@@ -118,6 +118,15 @@
     </div>
   </section>
 
+  <!-- ═══ OVERVIEW GRID ═══ -->
+  <section class="overview-section">
+    <div class="container">
+      <div class="overview-grid" id="overviewGrid">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ DAILY STATS BANNER ═══ -->
   <section class="stats-banner">
     <div class="container">
@@ -146,8 +155,13 @@
           <span class="kpi-value" id="kpiPending">--</span>
           <span class="kpi-label">Pending</span>
         </div>
+        <div class="stats-sparkline-wrap" id="sparklineWrap" style="display:none">
+          <svg id="pnlSparkline" width="100" height="36" viewBox="0 0 100 36"></svg>
+          <span class="sparkline-label">7-day P&amp;L</span>
+        </div>
       </div>
-      <div class="stats-row stats-row-trades" id="tradeStatsRow">
+      <div id="statsErrorBadge" class="stats-error-badge" style="display:none"></div>
+      <div class="stats-row stats-row-trades" id="tradeStatsRow" style="display:none">
         <div class="stats-kpi">
           <span class="kpi-value" id="kpiPositions">--</span>
           <span class="kpi-label">Trade Groups (30d)</span>
@@ -167,6 +181,10 @@
         <div class="stats-kpi">
           <span class="kpi-value" id="kpiTradePnL">--</span>
           <span class="kpi-label">P&amp;L $ (30d)</span>
+        </div>
+        <div class="stats-kpi">
+          <span class="kpi-value" id="kpiTradePF">--</span>
+          <span class="kpi-label">Prof. Factor (30d)</span>
         </div>
         <div class="stats-kpi">
           <span class="kpi-value" id="kpiAvgSlots">--</span>
@@ -195,6 +213,9 @@
           <div class="signal-direction-wrap">
             <div class="signal-direction" id="signalDirection">HOLD</div>
             <div class="signal-strength" id="signalStrength"></div>
+          </div>
+          <div class="signal-reason-wrap" id="signalReasonWrap" style="display:none">
+            <span class="signal-reason-text" id="signalReason"></span>
           </div>
           <div class="signal-meta">
             <span class="signal-model" id="signalModel">--</span>
@@ -247,6 +268,9 @@
             </div>
             <div class="detail-row">
               <span>Risk Mult.</span><span id="detailRisk">--</span>
+            </div>
+            <div class="detail-row">
+              <span>Capital Alloc.</span><span id="detailAlloc">--</span>
             </div>
           </div>
         </div>
@@ -334,6 +358,15 @@
       </div>
     </div>
   </footer>
+
+  <!-- Error log panel -->
+  <div id="errorPanel" class="error-panel" style="display:none">
+    <div class="error-panel-header" onclick="toggleErrorPanel()">
+      <span>&#9888; Recent Errors</span>
+      <span id="errorCount" class="error-count">0</span>
+    </div>
+    <div id="errorLogBody" class="error-log"></div>
+  </div>
 
   <!-- Signal tooltip for history markers -->
   <div id="signalTooltip" class="signal-tooltip"></div>
