@@ -831,21 +831,18 @@
       const data = await resp.json();
       if (gen !== undefined && gen !== switchId) return;
       const ts = data[sym];
-      if (!ts) return;
-      kpiPositions.textContent = ts.positions;
-      kpiTradeWR.textContent = ts.win_rate + '%';
-      kpiTradeWins.textContent = ts.wins;
-      kpiTradeLosses.textContent = ts.losses;
-      kpiTradePnL.textContent = (ts.net_pnl >= 0 ? '+$' : '-$') + Math.abs(ts.net_pnl).toFixed(2);
-      if (kpiAvgSlots && ts.avg_slots != null) kpiAvgSlots.textContent = 'avg ' + ts.avg_slots + ' slots';
-      // Color coding
-      const wrEl = kpiTradeWR.parentElement;
-      wrEl.className = 'stats-kpi ' + (ts.win_rate >= 50 ? 'kpi-trade-wr-good' : 'kpi-trade-wr-bad');
-      const pnlEl = kpiTradePnL.parentElement;
-      pnlEl.className = 'stats-kpi ' + (ts.net_pnl >= 0 ? 'kpi-trade-pnl-pos' : 'kpi-trade-pnl-neg');
-      // Hide row if no positions
-      const row = $('tradeStatsRow');
-      if (row) row.style.display = ts.positions > 0 ? '' : 'none';
+      if (ts && ts.positions > 0) {
+        kpiPositions.textContent = ts.positions;
+        kpiTradeWR.textContent = ts.win_rate + '%';
+        kpiTradeWins.textContent = ts.wins;
+        kpiTradeLosses.textContent = ts.losses;
+        kpiTradePnL.textContent = (ts.net_pnl >= 0 ? '+$' : '-$') + Math.abs(ts.net_pnl).toFixed(2);
+        if (kpiAvgSlots && ts.avg_slots != null) kpiAvgSlots.textContent = 'avg ' + ts.avg_slots + ' slots';
+        const wrEl = kpiTradeWR.parentElement;
+        wrEl.className = 'stats-kpi ' + (ts.win_rate >= 50 ? 'kpi-trade-wr-good' : 'kpi-trade-wr-bad');
+        const pnlEl = kpiTradePnL.parentElement;
+        pnlEl.className = 'stats-kpi ' + (ts.net_pnl >= 0 ? 'kpi-trade-pnl-pos' : 'kpi-trade-pnl-neg');
+      }
     } catch (err) {
       console.warn('Trade stats fetch error:', err.message);
     }

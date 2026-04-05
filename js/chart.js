@@ -402,11 +402,12 @@ const ChartManager = (() => {
       } catch(e) {}
     }
 
+    const reasonClass = reason === 'manual' ? 'hold' : (profitable ? 'buy' : 'sell');
     tooltip.innerHTML = `
       <div class="tt-header">
         <span class="sig-badge ${dirClass}">${dir}</span>
         <span class="sig-badge trade-badge">TRADE</span>
-        <span class="sig-badge ${profitable ? 'buy' : 'sell'}">${reason}</span>
+        <span class="sig-badge ${reasonClass}">${reason.toUpperCase()}</span>
       </div>
       <div class="tt-row"><span>Entry</span><span>${entryP}</span></div>
       <div class="tt-row"><span>Exit</span><span>${exitP}</span></div>
@@ -444,7 +445,7 @@ const ChartManager = (() => {
       if (Math.abs(pnl) > 1e6) continue;
       const profitable = pnl >= 0;
 
-      // Single marker per group at exit bar — green if profit, red if loss
+      // Single marker per group at exit bar — green=profit, red=loss, amber=manual
       if (t.exit_time) {
         let iso = t.exit_time.replace(' ', 'T');
         if (!iso.includes('Z') && !iso.includes('+')) iso += 'Z';
@@ -452,10 +453,12 @@ const ChartManager = (() => {
         const absPnl = Math.abs(pnl);
         const pnlLabel = absPnl >= 1 ? Math.round(absPnl) : absPnl.toFixed(2);
         const pnlText = (profitable ? '+$' : '-$') + pnlLabel;
+        const isManual = (t.close_reason === 'manual');
+        const markerColor = isManual ? '#f59e0b' : (profitable ? '#22c55e' : '#ef4444');
         tradeMarkers.push({
           time: exitTs,
           position: pos,
-          color: profitable ? '#22c55e' : '#ef4444',
+          color: markerColor,
           shape: 'square',
           text: pnlText,
         });
