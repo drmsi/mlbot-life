@@ -456,6 +456,24 @@
     await switchSymbol('XAUUSD');
   }
 
+  function resetTradeKPIs() {
+    if (kpiPositions)   kpiPositions.textContent   = '--';
+    if (kpiTradeWR)     kpiTradeWR.textContent      = '--';
+    if (kpiTradeWins)   kpiTradeWins.textContent    = '--';
+    if (kpiTradeLosses) kpiTradeLosses.textContent  = '--';
+    if (kpiTradePnL)    kpiTradePnL.textContent     = '--';
+    if (kpiTradePF)     kpiTradePF.textContent      = '--';
+    if (kpiAvgSlots)    kpiAvgSlots.textContent     = '';
+    if (kpiTradeWR)     kpiTradeWR.parentElement.className     = 'stats-kpi';
+    if (kpiTradePnL)    kpiTradePnL.parentElement.className    = 'stats-kpi';
+    if (kpiJournalOpens)    kpiJournalOpens.textContent    = '--';
+    if (kpiJournalSkips)    kpiJournalSkips.textContent    = '--';
+    if (kpiJournalTimeouts) kpiJournalTimeouts.textContent = '--';
+    if (kpiJournalBE)       kpiJournalBE.textContent       = '--';
+    if (kpiJournalCB)       kpiJournalCB.textContent       = '--';
+    if (kpiJournalGate)     kpiJournalGate.textContent     = '--';
+  }
+
   async function switchSymbol(sym) {
     currentSymbol = sym;
     const mySwitch = ++switchId;  // capture switch generation
@@ -463,6 +481,7 @@
     chartLastBar.textContent = '--';
     ChartManager.setSymbol(sym);
     resetSignalPanel();
+    resetTradeKPIs();
 
     // Clear history for the old symbol so stale rows don't bleed into new symbol view
     signalHistory = [];
@@ -857,6 +876,8 @@
         wrEl.className = 'stats-kpi ' + (ts.win_rate >= 50 ? 'kpi-trade-wr-good' : 'kpi-trade-wr-bad');
         const pnlEl = kpiTradePnL.parentElement;
         pnlEl.className = 'stats-kpi ' + (ts.net_pnl >= 0 ? 'kpi-trade-pnl-pos' : 'kpi-trade-pnl-neg');
+      } else {
+        resetTradeKPIs();
       }
     } catch (err) {
       console.warn('Trade stats fetch error:', err.message);
@@ -873,12 +894,10 @@
       const data = await resp.json();
       if (gen !== undefined && gen !== switchId) return;
       const stats = data.stats || {};
-      if (kpiTradePF) {
-        const pf = stats.profit_factor ?? stats.pf;
-        kpiTradePF.textContent = pf != null ? pf.toFixed(2) : '--';
-      }
+      const pf = stats.profit_factor ?? stats.pf;
+      if (kpiTradePF) kpiTradePF.textContent = pf != null ? pf.toFixed(2) : '--';
     } catch (err) {
-      // Trade summary not critical — skip silently (EA may not be reporting yet)
+      if (kpiTradePF) kpiTradePF.textContent = '--';
     }
   }
 
@@ -892,9 +911,25 @@
       const data = await resp.json();
       if (gen !== undefined && gen !== switchId) return;
       const ev = data.events;
-      if (!ev) return;
+      if (!ev) {
+        if (kpiJournalOpens) kpiJournalOpens.textContent = '--';
+        if (kpiJournalSkips) kpiJournalSkips.textContent = '--';
+        if (kpiJournalTimeouts) kpiJournalTimeouts.textContent = '--';
+        if (kpiJournalBE) kpiJournalBE.textContent = '--';
+        if (kpiJournalCB) kpiJournalCB.textContent = '--';
+        if (kpiJournalGate) kpiJournalGate.textContent = '--';
+        return;
+      }
       const total = Object.values(ev).reduce((a, b) => a + b, 0);
-      if (total === 0 && !ev.group_open) return; // no journal data yet
+      if (total === 0 && !ev.group_open) {
+        if (kpiJournalOpens) kpiJournalOpens.textContent = '--';
+        if (kpiJournalSkips) kpiJournalSkips.textContent = '--';
+        if (kpiJournalTimeouts) kpiJournalTimeouts.textContent = '--';
+        if (kpiJournalBE) kpiJournalBE.textContent = '--';
+        if (kpiJournalCB) kpiJournalCB.textContent = '--';
+        if (kpiJournalGate) kpiJournalGate.textContent = '--';
+        return;
+      }
       if (journalActivityRow) journalActivityRow.style.display = '';
       if (kpiJournalOpens)    kpiJournalOpens.textContent    = ev.group_open      ?? '--';
       if (kpiJournalSkips)    kpiJournalSkips.textContent    = ev.entry_skip      ?? '--';
