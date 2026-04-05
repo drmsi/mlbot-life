@@ -309,8 +309,6 @@ a:hover { color: #818cf8; }
 .price-row.sl .price-value { color: var(--sell); }
 .price-row.tp1 { background: var(--buy-bg); }
 .price-row.tp1 .price-value { color: var(--buy); }
-.price-row.tp2 { background: rgba(34,197,94,0.08); }
-.price-row.tp2 .price-value { color: #86efac; }
 
 /* Probability bars */
 .signal-probs { display: flex; flex-direction: column; gap: 8px; }

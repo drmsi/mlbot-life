@@ -9,12 +9,10 @@ const ChartManager = (() => {
   // Live signal price lines
   let slLine = null;
   let tp1Line = null;
-  let tp2Line = null;
   let entryLine = null;
   // History signal price lines (for most recent pending)
   let histSlLine = null;
   let histTp1Line = null;
-  let histTp2Line = null;
   let histEntryLine = null;
 
   let markers = [];
@@ -161,7 +159,6 @@ const ChartManager = (() => {
         <div class="tt-row"><span>Entry</span><span>${match.price != null ? match.price.toFixed(dec) : '--'}</span></div>
         <div class="tt-row"><span>SL</span><span>${match.sl != null ? match.sl.toFixed(dec) : '--'}</span></div>
         <div class="tt-row"><span>TP1</span><span>${match.tp1 != null ? match.tp1.toFixed(dec) : '--'}</span></div>
-        <div class="tt-row"><span>TP2</span><span>${match.tp2 != null ? match.tp2.toFixed(dec) : '--'}</span></div>
         <div class="tt-row"><span>ATR</span><span>${match.atr != null ? match.atr : '--'}</span></div>
         <div class="tt-row"><span>Model</span><span>${match.model || '--'}</span></div>
         ${match.exit_price != null ? `<div class="tt-row"><span>Exit</span><span>${match.exit_price.toFixed(dec)}</span></div>` : ''}
@@ -207,18 +204,16 @@ const ChartManager = (() => {
   function clearSignalLines() {
     try { if (slLine)    { candleSeries.removePriceLine(slLine); } } catch(e) {}
     try { if (tp1Line)   { candleSeries.removePriceLine(tp1Line); } } catch(e) {}
-    try { if (tp2Line)   { candleSeries.removePriceLine(tp2Line); } } catch(e) {}
     try { if (entryLine) { candleSeries.removePriceLine(entryLine); } } catch(e) {}
-    slLine = null; tp1Line = null; tp2Line = null; entryLine = null;
+    slLine = null; tp1Line = null; entryLine = null;
     hasActiveSignal = false;
   }
 
   function _clearHistoryPriceLines() {
     try { if (histSlLine)    { candleSeries.removePriceLine(histSlLine); } } catch(e) {}
     try { if (histTp1Line)   { candleSeries.removePriceLine(histTp1Line); } } catch(e) {}
-    try { if (histTp2Line)   { candleSeries.removePriceLine(histTp2Line); } } catch(e) {}
     try { if (histEntryLine) { candleSeries.removePriceLine(histEntryLine); } } catch(e) {}
-    histSlLine = null; histTp1Line = null; histTp2Line = null; histEntryLine = null;
+    histSlLine = null; histTp1Line = null; histEntryLine = null;
   }
 
   function _drawPriceLines(sig, prefix) {
@@ -252,14 +247,6 @@ const ChartManager = (() => {
         axisLabelVisible: true, title: 'TP1 ' + sig.tp1.toFixed(dec),
       });
       if (isHist) histTp1Line = line; else tp1Line = line;
-    }
-    if (sig.tp2 != null) {
-      const line = candleSeries.createPriceLine({
-        price: sig.tp2, color: '#86efac', lineWidth: 1,
-        lineStyle: LightweightCharts.LineStyle.Dotted,
-        axisLabelVisible: true, title: 'TP2 ' + sig.tp2.toFixed(dec),
-      });
-      if (isHist) histTp2Line = line; else tp2Line = line;
     }
   }
 
@@ -507,8 +494,8 @@ const ChartManager = (() => {
     expandedTs = null;
     liveSignalTs = null;
     liveSignalDir = null;
-    slLine = null; tp1Line = null; tp2Line = null; entryLine = null;
-    histSlLine = null; histTp1Line = null; histTp2Line = null; histEntryLine = null;
+    slLine = null; tp1Line = null; entryLine = null;
+    histSlLine = null; histTp1Line = null; histEntryLine = null;
     if (candleSeries) {
       candleSeries.setData([]);
       candleSeries.setMarkers([]);

@@ -410,7 +410,6 @@
   const priceEntry   = $('priceEntry');
   const priceSL      = $('priceSL');
   const priceTP1     = $('priceTP1');
-  const priceTP2     = $('priceTP2');
   const probBuy      = $('probBuy');
   const probHold     = $('probHold');
   const probSell     = $('probSell');
@@ -966,7 +965,6 @@
     priceEntry.textContent = sig.price != null ? sig.price.toFixed(dec) : '--';
     priceSL.textContent    = (sig.sl != null && sig.sl !== 0)  ? sig.sl.toFixed(dec)  : (dir !== 'HOLD' ? 'Trail' : '--');
     priceTP1.textContent   = (sig.tp != null && sig.tp !== 0)  ? sig.tp.toFixed(dec)  : (dir !== 'HOLD' ? 'Trail' : '--');
-    priceTP2.textContent   = (sig.tp2 != null && sig.tp2 !== 0) ? sig.tp2.toFixed(dec) : (dir !== 'HOLD' ? 'Trail' : '--');
 
     // Probabilities
     const bp = (sig.buy_prob  || 0) * 100;
@@ -1006,7 +1004,6 @@
     priceEntry.textContent = '--';
     priceSL.textContent = '--';
     priceTP1.textContent = '--';
-    priceTP2.textContent = '--';
     probBuy.style.width = '0%';
     probHold.style.width = '0%';
     probSell.style.width = '0%';
@@ -1053,7 +1050,6 @@
       entry:    sig.price != null ? sig.price.toFixed(dec) : '--',
       sl:       (sig.sl != null && sig.sl !== 0)  ? sig.sl.toFixed(dec)  : 'Trail',
       tp1:      (sig.tp != null && sig.tp !== 0)  ? sig.tp.toFixed(dec)  : 'Trail',
-      tp2:      (sig.tp2 != null && sig.tp2 !== 0) ? sig.tp2.toFixed(dec) : 'Trail',
       strength: sig.strength_label || '--',
       outcome:  outcome,
       outcomeClass: outcomeClass,
@@ -1076,7 +1072,6 @@
         <td>${h.entry}</td>
         <td>${h.sl}</td>
         <td>${h.tp1}</td>
-        <td>${h.tp2}</td>
         <td><span class="sig-badge ${h.outcomeClass}">${h.outcome}</span></td>
         <td>${h.strength}</td>
       </tr>
