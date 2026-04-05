@@ -464,6 +464,10 @@
     ChartManager.setSymbol(sym);
     resetSignalPanel();
 
+    // Clear history for the old symbol so stale rows don't bleed into new symbol view
+    signalHistory = [];
+    renderHistory();
+
     // Backfill historical signals on first visit to a symbol
     if (!backfilledSymbols.has(sym)) {
       backfilledSymbols.add(sym);
