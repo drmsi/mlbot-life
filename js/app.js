@@ -592,7 +592,7 @@
   function renderOverviewGrid() {
     const grid = $('overviewGrid');
     if (!grid) return;
-    const symbols = ['XAUUSD','BTCUSD','EURUSD','ETHUSD','GBPUSD','XAGUSD','USDJPY','BRENTCMDUSD'];
+    const symbols = ['BTCUSD','ETHUSD','XAUUSD','XAGUSD','BRENTCMDUSD','EURUSD','GBPUSD','USDJPY'];
     const names   = {XAUUSD:'Gold',BTCUSD:'BTC',EURUSD:'EUR',ETHUSD:'ETH',GBPUSD:'GBP',XAGUSD:'Silver',USDJPY:'JPY',BRENTCMDUSD:'Brent'};
     grid.innerHTML = symbols.map(sym => {
       const sig = allSignalsCache[sym];
