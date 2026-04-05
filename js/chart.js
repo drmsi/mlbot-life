@@ -490,12 +490,12 @@ const ChartManager = (() => {
     historySignals = [];
     tradeMarkers = [];
     tradeRecords = [];
-    hasActiveSignal = false;
     expandedTs = null;
     liveSignalTs = null;
     liveSignalDir = null;
-    slLine = null; tp1Line = null; entryLine = null;
-    histSlLine = null; histTp1Line = null; histEntryLine = null;
+    // Remove price lines from chart BEFORE nulling refs (prevents ghost lines on symbol switch)
+    clearSignalLines();
+    _clearHistoryPriceLines();
     if (candleSeries) {
       candleSeries.setData([]);
       candleSeries.setMarkers([]);
