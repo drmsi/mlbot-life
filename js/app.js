@@ -713,15 +713,38 @@
   async function fetchStats(gen) {
     const sym = currentSymbol;
 
-    // Try server-side stats first (reliable, persists across sessions)
+    // Try server-side stats (Mon → today), aggregate week in parallel
     let serverStats = null;
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/stats/daily?symbol=${sym}&dt=${today}`);
+      const today = new Date();
+      const dow = today.getDay();                        // 0=Sun … 6=Sat
+      const daysSinceMon = dow === 0 ? 6 : dow - 1;     // Mon=0 … Sun=6
+      const dates = [];
+      for (let i = daysSinceMon; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        dates.push(d.toISOString().split('T')[0]);
+      }
+      const dailyResults = await Promise.all(dates.map(dt =>
+        fetch(`${BRIDGE_URL}/v4/public/stats/daily?symbol=${sym}&dt=${dt}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(json => json && json[sym] ? json[sym] : null)
+          .catch(() => null)
+      ));
       if (gen !== undefined && gen !== switchId) return;
-      if (resp.ok) {
-        const data = await resp.json();
-        serverStats = data[sym];
+      let total = 0, completed = 0, pending = 0, tp = 0, sl = 0, pnl = 0;
+      for (const r of dailyResults) {
+        if (!r) continue;
+        total     += r.total     || 0;
+        completed += r.completed || 0;
+        pending   += r.pending   || 0;
+        tp        += r.tp        || 0;
+        sl        += r.sl        || 0;
+        pnl       += r.pnl_pips  || 0;
+      }
+      if (total > 0) {
+        const win_rate = completed > 0 ? Math.round((tp / completed) * 1000) / 10 : 0;
+        serverStats = { total, completed, pending, tp, sl, win_rate, pnl_pips: Math.round(pnl * 100) / 100 };
       }
     } catch (err) {
       // fall through to SignalTracker
