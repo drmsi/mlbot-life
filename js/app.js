@@ -489,9 +489,12 @@
     fetchSparklineData(sym).then(data => {
       if (switchId === mySwitch) renderSparkline(data);
     });
-    fetchCandles(mySwitch).then(() => {
+    fetchCandles(mySwitch).then(async () => {
       if (switchId !== mySwitch) return;  // symbol changed while fetching
-      fetchSignal(mySwitch);
+      // fetchSignal must complete first so liveSignalTs is set before
+      // drawHistoryMarkers runs its dedup check — prevents same-bar duplicate markers
+      await fetchSignal(mySwitch);
+      if (switchId !== mySwitch) return;
       fetchHistory(mySwitch);
       fetchTradeHistory(mySwitch);
     });
