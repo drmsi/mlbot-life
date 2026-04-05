@@ -435,6 +435,14 @@
   const kpiTradePnL    = $('kpiTradePnL');
   const kpiTradePF     = $('kpiTradePF');
   const kpiAvgSlots    = $('kpiAvgSlotsInline');
+  // EA Journal KPIs (v5.36+)
+  const kpiJournalOpens    = $('kpiJournalOpens');
+  const kpiJournalSkips    = $('kpiJournalSkips');
+  const kpiJournalTimeouts = $('kpiJournalTimeouts');
+  const kpiJournalBE       = $('kpiJournalBE');
+  const kpiJournalCB       = $('kpiJournalCB');
+  const kpiJournalGate     = $('kpiJournalGate');
+  const journalActivityRow = $('journalActivityRow');
   // New fields
   const signalReasonWrap = $('signalReasonWrap');
   const signalReason     = $('signalReason');
@@ -473,6 +481,7 @@
     fetchStats(mySwitch);
     fetchTradeStats(mySwitch);
     fetchTradeSummary(mySwitch);
+    fetchJournalStats(mySwitch);
     fetchSparklineData(sym).then(data => {
       if (switchId === mySwitch) renderSparkline(data);
     });
@@ -485,7 +494,7 @@
     pollTimer    = setInterval(() => fetchSignal(switchId),  POLL_INTERVAL_MS);
     candleTimer  = setInterval(() => { fetchCandles(switchId); fetchStats(switchId); }, CANDLE_POLL_MS);
     historyTimer = setInterval(() => fetchHistory(switchId), CANDLE_POLL_MS);
-    tradeTimer   = setInterval(() => { fetchTradeHistory(switchId); fetchTradeStats(switchId); fetchTradeSummary(switchId); }, CANDLE_POLL_MS);
+    tradeTimer   = setInterval(() => { fetchTradeHistory(switchId); fetchTradeStats(switchId); fetchTradeSummary(switchId); fetchJournalStats(switchId); }, CANDLE_POLL_MS);
     sparkTimer   = setInterval(() => {
       fetchSparklineData(currentSymbol).then(data => { if (switchId !== undefined) renderSparkline(data); });
     }, 5 * 60 * 1000); // refresh sparkline every 5 min
@@ -863,6 +872,31 @@
       }
     } catch (err) {
       // Trade summary not critical — skip silently (EA may not be reporting yet)
+    }
+  }
+
+  // ── Fetch EA Journal Stats (v5.36+) ────────────────────────────────
+  async function fetchJournalStats(gen) {
+    try {
+      const sym = currentSymbol;
+      const resp = await fetch(`${BRIDGE_URL}/v4/public/journal/stats?symbol=${sym}&days=30`);
+      if (gen !== undefined && gen !== switchId) return;
+      if (!resp.ok) return; // endpoint may not exist on older bridge — skip silently
+      const data = await resp.json();
+      if (gen !== undefined && gen !== switchId) return;
+      const ev = data.events;
+      if (!ev) return;
+      const total = Object.values(ev).reduce((a, b) => a + b, 0);
+      if (total === 0 && !ev.group_open) return; // no journal data yet
+      if (journalActivityRow) journalActivityRow.style.display = '';
+      if (kpiJournalOpens)    kpiJournalOpens.textContent    = ev.group_open      ?? '--';
+      if (kpiJournalSkips)    kpiJournalSkips.textContent    = ev.entry_skip      ?? '--';
+      if (kpiJournalTimeouts) kpiJournalTimeouts.textContent = ev.order_timeout   ?? '--';
+      if (kpiJournalBE)       kpiJournalBE.textContent       = ev.be_triggered    ?? '--';
+      if (kpiJournalCB)       kpiJournalCB.textContent       = ev.circuit_breaker ?? '--';
+      if (kpiJournalGate)     kpiJournalGate.textContent     = ev.loss_gate       ?? '--';
+    } catch (err) {
+      // Journal stats not critical — skip silently (EA < v5.36 won't have data)
     }
   }
 
