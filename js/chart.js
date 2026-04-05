@@ -333,25 +333,26 @@ const ChartManager = (() => {
       if (p.ts > latestTs) latestTs = p.ts;
     }
 
+    // Find the single latest entry (first max-ts hit only — avoids two arrows on same bar)
+    let latestIdx = -1;
+    for (let i = 0; i < parsed.length; i++) {
+      if (parsed[i].ts === latestTs && latestIdx === -1) latestIdx = i;
+    }
+
     // Build markers — latest signal gets arrow + auto-expand, rest get small circles
-    for (const p of parsed) {
-      const { sig: s, ts, dir } = p;
+    for (let i = 0; i < parsed.length; i++) {
+      const { sig: s, ts, dir } = parsed[i];
       const isPending = (s.outcome === null || s.outcome === undefined);
-      const isLatest = (ts === latestTs);
+      const isLatest = (i === latestIdx);
 
       historyMarkers.push({
         time: ts,
         position: dir === 'BUY' ? 'belowBar' : 'aboveBar',
         color: isPending ? (dir === 'BUY' ? GLOW_BUY : GLOW_SELL)
                          : (dir === 'BUY' ? '#22c55e' : '#ef4444'),
-        shape: isLatest ? 'arrowUp' : 'circle',
-        // Latest gets direction label, rest are blank
+        shape: isLatest ? (dir === 'SELL' ? 'arrowDown' : 'arrowUp') : 'circle',
         text: isLatest ? dir : '',
       });
-      // Fix arrow direction for SELL
-      if (isLatest && dir === 'SELL') {
-        historyMarkers[historyMarkers.length - 1].shape = 'arrowDown';
-      }
       historySignals.push({ ...s, _ts: ts });
     }
 
@@ -467,21 +468,29 @@ const ChartManager = (() => {
 
   function _mergeAndSetMarkers() {
     if (!candleSeries) return;
-    const all = [...markers, ...historyMarkers, ...tradeMarkers];
-    // Live arrows take precedence over history circles on same bar+position
+
+    // Priority: live markers > history markers > trade squares (always shown)
+    // At each time+position slot only ONE non-square marker is kept.
+    const liveKeys = new Set(markers.map(m => m.time + '_' + m.position));
     const arrowKeys = new Set();
-    for (const m of all) {
+    for (const m of [...markers, ...historyMarkers]) {
       if (m.shape !== 'circle') arrowKeys.add(m.time + '_' + m.position);
     }
-    const filtered = all.filter(m => {
-      // Only dedup circles vs arrows; squares (trades) always shown
-      if (m.shape === 'circle' && arrowKeys.has(m.time + '_' + m.position)) return false;
-      return true;
-    });
+
+    const seen = new Set();  // tracks filled time+position slots
+    const filtered = [];
+
+    for (const m of [...markers, ...historyMarkers, ...tradeMarkers]) {
+      if (m.shape === 'square') { filtered.push(m); continue; }         // trades always in
+      if (m.shape === 'circle' && arrowKeys.has(m.time + '_' + m.position)) continue; // circle behind arrow
+      const slot = m.time + '_' + m.position;
+      if (seen.has(slot)) continue;  // already have an arrow here (live wins, being first)
+      seen.add(slot);
+      filtered.push(m);
+    }
+
     filtered.sort((a, b) => a.time - b.time);
-    try {
-      candleSeries.setMarkers(filtered);
-    } catch(e) {}
+    try { candleSeries.setMarkers(filtered); } catch(e) {}
   }
 
   function setSymbol(sym) {

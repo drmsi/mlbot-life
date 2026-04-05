@@ -201,6 +201,13 @@ a:hover { color: #818cf8; }
   letter-spacing: 0.5px;
   margin-top: 2px;
 }
+.kpi-sublabel {
+  display: block;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 1px;
+}
 .kpi-green .kpi-value { color: var(--buy); }
 .kpi-red   .kpi-value { color: var(--sell); }
 .kpi-wr-good .kpi-value     { color: var(--buy); }

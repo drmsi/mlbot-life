@@ -435,7 +435,7 @@
   const kpiTradeLosses = $('kpiTradeLosses');
   const kpiTradePnL    = $('kpiTradePnL');
   const kpiTradePF     = $('kpiTradePF');
-  const kpiAvgSlots    = $('kpiAvgSlots');
+  const kpiAvgSlots    = $('kpiAvgSlotsInline');
   // New fields
   const signalReasonWrap = $('signalReasonWrap');
   const signalReason     = $('signalReason');
@@ -814,7 +814,7 @@
       kpiTradeWins.textContent = ts.wins;
       kpiTradeLosses.textContent = ts.losses;
       kpiTradePnL.textContent = (ts.net_pnl >= 0 ? '+$' : '-$') + Math.abs(ts.net_pnl).toFixed(2);
-      kpiAvgSlots.textContent = ts.avg_slots;
+      if (kpiAvgSlots && ts.avg_slots != null) kpiAvgSlots.textContent = 'avg ' + ts.avg_slots + ' slots';
       // Color coding
       const wrEl = kpiTradeWR.parentElement;
       wrEl.className = 'stats-kpi ' + (ts.win_rate >= 50 ? 'kpi-trade-wr-good' : 'kpi-trade-wr-bad');
