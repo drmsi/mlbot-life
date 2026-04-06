@@ -225,7 +225,7 @@ def validate_implementation():
     # Check for hardcoded API URLs (should use constant)
     with open(app_js, 'r', encoding='utf-8') as f:
         app_content = f.read()
-        if 'gold.ddd.bz' in app_content and 'BRIDGE_URL' in app_content:
+        if 'mlbot.ddd.bz' in app_content and 'BRIDGE_URL' in app_content:
             print("  ✓ API URL uses constant")
         else:
             print("  ⚠ Warning: API URL might not use constant")

@@ -49,7 +49,7 @@ def init_project():
 
     # Verify bridge connectivity
     print("\n🔌 Checking bridge connectivity...")
-    print(f"  Bridge URL: https://gold.ddd.bz")
+    print(f"  Bridge URL: https://mlbot.ddd.bz")
     print("  → Endpoints:")
     print("    • /v4/public/signals - Live signals")
     print("    • /v4/public/signals/{symbol}/history - Signal history")

@@ -38,7 +38,7 @@ Real-time AI-powered trading signals dashboard with comprehensive signal trackin
 
 ### Prerequisites
 - A web browser (Chrome, Firefox, Safari, or Edge)
-- Access to the bridge API at `https://gold.ddd.bz`
+- Access to the bridge API at `https://mlbot.ddd.bz`
 
 ### Quick Start
 

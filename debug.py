@@ -56,7 +56,7 @@ def analyze_tracked_signals():
             ],
             "solutions": [
                 "Check internet connection",
-                "Verify bridge is accessible: https://gold.ddd.bz",
+                "Verify bridge is accessible: https://mlbot.ddd.bz",
                 "Clear localStorage if quota exceeded",
                 "Check browser console for specific error messages"
             ]

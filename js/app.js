@@ -7,7 +7,7 @@
   'use strict';
 
   // ── Config ──────────────────────────────────────────────────────────
-  const BRIDGE_URL  = 'https://gold.ddd.bz';
+  const BRIDGE_URL  = 'https://mlbot.ddd.bz';
   const POLL_INTERVAL_MS = 30000;   // poll signals every 30s
   const CANDLE_POLL_MS   = 60000;   // poll candles every 60s
   const MAX_HISTORY      = 50;
