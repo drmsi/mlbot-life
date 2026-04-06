@@ -8,11 +8,11 @@ const ChartManager = (() => {
   let candleSeries = null;
   // Live signal price lines
   let slLine = null;
-  let tp1Line = null;
+  let tpALine = null;
   let entryLine = null;
   // History signal price lines (for most recent pending)
   let histSlLine = null;
-  let histTp1Line = null;
+  let histTpALine = null;
   let histEntryLine = null;
 
   let markers = [];
@@ -145,12 +145,12 @@ const ChartManager = (() => {
       // Redraw price lines for the clicked signal (clear previous history lines first)
       _clearHistoryPriceLines();
       if (!hasActiveSignal) {
-        _drawPriceLines({ price: match.price, sl: match.sl, tp1: match.tp1, tp2: match.tp2 }, 'hist');
+        _drawPriceLines({ price: match.price, sl: match.sl, tpA: match.tpA, tpB: match.tpB }, 'hist');
       }
       const dec = PRICE_DECIMALS[currentSymbol] || 2;
       const outcomeText = match.outcome || 'Pending';
       const outcomeClass = match.outcome === 'SL' ? 'sell'
-        : (match.outcome && match.outcome.startsWith('TP')) ? 'buy' : 'hold';
+        : (match.outcome && (match.outcome.startsWith('hit') || match.outcome.startsWith('TP'))) ? 'buy' : 'hold';
       tooltip.innerHTML = `
         <div class="tt-header">
           <span class="sig-badge ${match.direction.toLowerCase()}">${match.direction}</span>
@@ -158,7 +158,8 @@ const ChartManager = (() => {
         </div>
         <div class="tt-row"><span>Entry</span><span>${match.price != null ? match.price.toFixed(dec) : '--'}</span></div>
         <div class="tt-row"><span>SL</span><span>${match.sl != null ? match.sl.toFixed(dec) : '--'}</span></div>
-        <div class="tt-row"><span>TP1</span><span>${match.tp1 != null ? match.tp1.toFixed(dec) : '--'}</span></div>
+        <div class="tt-row"><span>TpA</span><span>${match.tpA != null ? match.tpA.toFixed(dec) : '--'}</span></div>
+        <div class="tt-row"><span>TpB</span><span>${match.tpB != null ? match.tpB.toFixed(dec) : '--'}</span></div>
         <div class="tt-row"><span>ATR</span><span>${match.atr != null ? match.atr : '--'}</span></div>
         <div class="tt-row"><span>Model</span><span>${match.model || '--'}</span></div>
         ${match.exit_price != null ? `<div class="tt-row"><span>Exit</span><span>${match.exit_price.toFixed(dec)}</span></div>` : ''}
@@ -203,17 +204,17 @@ const ChartManager = (() => {
 
   function clearSignalLines() {
     try { if (slLine)    { candleSeries.removePriceLine(slLine); } } catch(e) {}
-    try { if (tp1Line)   { candleSeries.removePriceLine(tp1Line); } } catch(e) {}
+    try { if (tpALine)   { candleSeries.removePriceLine(tpALine); } } catch(e) {}
     try { if (entryLine) { candleSeries.removePriceLine(entryLine); } } catch(e) {}
-    slLine = null; tp1Line = null; entryLine = null;
+    slLine = null; tpALine = null; entryLine = null;
     hasActiveSignal = false;
   }
 
   function _clearHistoryPriceLines() {
     try { if (histSlLine)    { candleSeries.removePriceLine(histSlLine); } } catch(e) {}
-    try { if (histTp1Line)   { candleSeries.removePriceLine(histTp1Line); } } catch(e) {}
+    try { if (histTpALine)   { candleSeries.removePriceLine(histTpALine); } } catch(e) {}
     try { if (histEntryLine) { candleSeries.removePriceLine(histEntryLine); } } catch(e) {}
-    histSlLine = null; histTp1Line = null; histEntryLine = null;
+    histSlLine = null; histTpALine = null; histEntryLine = null;
   }
 
   function _drawPriceLines(sig, prefix) {
@@ -240,13 +241,13 @@ const ChartManager = (() => {
       });
       if (isHist) histSlLine = line; else slLine = line;
     }
-    if (sig.tp1 != null) {
+    if (sig.tpA != null && sig.tpA !== 0) {
       const line = candleSeries.createPriceLine({
-        price: sig.tp1, color: '#22c55e', lineWidth: 1,
+        price: sig.tpA, color: '#22c55e', lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dashed,
-        axisLabelVisible: true, title: 'TP1 ' + sig.tp1.toFixed(dec),
+        axisLabelVisible: true, title: 'TpA ' + sig.tpA.toFixed(dec),
       });
-      if (isHist) histTp1Line = line; else tp1Line = line;
+      if (isHist) histTpALine = line; else tpALine = line;
     }
   }
 
@@ -263,7 +264,7 @@ const ChartManager = (() => {
     hasActiveSignal = true;
     _clearHistoryPriceLines();
 
-    _drawPriceLines({ price: signal.price, sl: signal.sl, tp1: signal.tp, tp2: signal.tp2 }, 'live');
+    _drawPriceLines({ price: signal.price, sl: signal.sl, tpA: signal.tpA, tpB: signal.tpB }, 'live');
 
     // Single arrow marker for the current live signal (replaces any previous)
     markers = [];
@@ -349,7 +350,7 @@ const ChartManager = (() => {
       if (latestSig) {
         expandedTs = latestTs;
         const s = latestSig.sig;
-        _drawPriceLines({ price: s.price, sl: s.sl, tp1: s.tp1, tp2: s.tp2 }, 'hist');
+        _drawPriceLines({ price: s.price, sl: s.sl, tpA: s.tpA, tpB: s.tpB }, 'hist');
       }
     } else {
       expandedTs = null;

@@ -329,8 +329,10 @@ a:hover { color: #818cf8; }
 .price-row.entry .price-value { color: var(--accent); }
 .price-row.sl { background: var(--sell-bg); }
 .price-row.sl .price-value { color: var(--sell); }
-.price-row.tp1 { background: var(--buy-bg); }
-.price-row.tp1 .price-value { color: var(--buy); }
+.price-row.tpa { background: var(--buy-bg); }
+.price-row.tpa .price-value { color: var(--buy); }
+.price-row.tpb { background: var(--buy-bg); }
+.price-row.tpb .price-value { color: var(--buy); }
 
 /* Probability bars */
 .signal-probs { display: flex; flex-direction: column; gap: 8px; }
