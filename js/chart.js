@@ -9,10 +9,12 @@ const ChartManager = (() => {
   // Live signal price lines
   let slLine = null;
   let tpALine = null;
+  let tpBLine = null;
   let entryLine = null;
   // History signal price lines (for most recent pending)
   let histSlLine = null;
   let histTpALine = null;
+  let histTpBLine = null;
   let histEntryLine = null;
 
   let markers = [];
@@ -205,16 +207,18 @@ const ChartManager = (() => {
   function clearSignalLines() {
     try { if (slLine)    { candleSeries.removePriceLine(slLine); } } catch(e) {}
     try { if (tpALine)   { candleSeries.removePriceLine(tpALine); } } catch(e) {}
+    try { if (tpBLine)   { candleSeries.removePriceLine(tpBLine); } } catch(e) {}
     try { if (entryLine) { candleSeries.removePriceLine(entryLine); } } catch(e) {}
-    slLine = null; tpALine = null; entryLine = null;
+    slLine = null; tpALine = null; tpBLine = null; entryLine = null;
     hasActiveSignal = false;
   }
 
   function _clearHistoryPriceLines() {
     try { if (histSlLine)    { candleSeries.removePriceLine(histSlLine); } } catch(e) {}
     try { if (histTpALine)   { candleSeries.removePriceLine(histTpALine); } } catch(e) {}
+    try { if (histTpBLine)   { candleSeries.removePriceLine(histTpBLine); } } catch(e) {}
     try { if (histEntryLine) { candleSeries.removePriceLine(histEntryLine); } } catch(e) {}
-    histSlLine = null; histTpALine = null; histEntryLine = null;
+    histSlLine = null; histTpALine = null; histTpBLine = null; histEntryLine = null;
   }
 
   function _drawPriceLines(sig, prefix) {
@@ -248,6 +252,14 @@ const ChartManager = (() => {
         axisLabelVisible: true, title: 'TpA ' + sig.tpA.toFixed(dec),
       });
       if (isHist) histTpALine = line; else tpALine = line;
+    }
+    if (sig.tpB != null && sig.tpB !== 0) {
+      const line = candleSeries.createPriceLine({
+        price: sig.tpB, color: '#4ade80', lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted,
+        axisLabelVisible: true, title: 'TpB ' + sig.tpB.toFixed(dec),
+      });
+      if (isHist) histTpBLine = line; else tpBLine = line;
     }
   }
 
