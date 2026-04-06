@@ -451,6 +451,15 @@
 
   // ── Init ────────────────────────────────────────────────────────────
   async function init() {
+    // ?reset=1 in URL clears all localStorage stats (use after server history clear)
+    if (new URLSearchParams(window.location.search).get('reset') === '1') {
+      localStorage.removeItem('ddd_tracked_signals');
+      debugLog('RESET', 'Cleared tracked signals via ?reset=1');
+      // Remove the param from URL so refresh doesn't re-clear
+      const url = new URL(window.location.href);
+      url.searchParams.delete('reset');
+      window.history.replaceState({}, '', url.toString());
+    }
     ChartManager.init('chartContainer');
     renderOverviewGrid(); // show empty grid immediately
     await switchSymbol('XAUUSD');
