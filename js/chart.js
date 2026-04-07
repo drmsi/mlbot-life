@@ -249,7 +249,7 @@ const ChartManager = (() => {
       const line = candleSeries.createPriceLine({
         price: sig.tpA, color: '#22c55e', lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dashed,
-        axisLabelVisible: true, title: 'TpA ' + sig.tpA.toFixed(dec),
+        axisLabelVisible: true, title: 'tp1 ' + sig.tpA.toFixed(dec),
       });
       if (isHist) histTpALine = line; else tpALine = line;
     }
@@ -257,7 +257,7 @@ const ChartManager = (() => {
       const line = candleSeries.createPriceLine({
         price: sig.tpB, color: '#4ade80', lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dotted,
-        axisLabelVisible: true, title: 'TpB ' + sig.tpB.toFixed(dec),
+        axisLabelVisible: true, title: 'tp2 ' + sig.tpB.toFixed(dec),
       });
       if (isHist) histTpBLine = line; else tpBLine = line;
     }
