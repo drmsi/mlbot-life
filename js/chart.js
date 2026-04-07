@@ -160,8 +160,8 @@ const ChartManager = (() => {
         </div>
         <div class="tt-row"><span>Entry</span><span>${match.price != null ? match.price.toFixed(dec) : '--'}</span></div>
         <div class="tt-row"><span>SL</span><span>${match.sl != null ? match.sl.toFixed(dec) : '--'}</span></div>
-        <div class="tt-row"><span>TpA</span><span>${match.tpA != null ? match.tpA.toFixed(dec) : '--'}</span></div>
-        <div class="tt-row"><span>TpB</span><span>${match.tpB != null ? match.tpB.toFixed(dec) : '--'}</span></div>
+        <div class="tt-row"><span>tp1</span><span>${match.tpA != null ? match.tpA.toFixed(dec) : '--'}</span></div>
+        <div class="tt-row"><span>tp2</span><span>${match.tpB != null ? match.tpB.toFixed(dec) : '--'}</span></div>
         <div class="tt-row"><span>ATR</span><span>${match.atr != null ? match.atr : '--'}</span></div>
         <div class="tt-row"><span>Model</span><span>${match.model || '--'}</span></div>
         ${match.exit_price != null ? `<div class="tt-row"><span>Exit</span><span>${match.exit_price.toFixed(dec)}</span></div>` : ''}
