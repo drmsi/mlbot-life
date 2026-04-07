@@ -60,13 +60,13 @@
           direction: sig.signal,
           entry: sig.price,
           sl: sig.sl,
-          tpA: sig.tpA,
-          tpB: sig.tpB,
+          tp1: sig.tp1,
+          tp2: sig.tp2,
           bar_time: sig.last_bar,
           model: sig.model_used,
           atr: sig.atr,
           tracked: false,
-          outcome: null, // 'hitTpA', 'hitTpB', 'SL', 'Pending'
+          outcome: null, // 'hitTp1', 'hitTp2', 'SL', 'Pending'
           outcome_bar: null,
           checked_bars: 0,
           max_check_bars: 100 // Maximum bars to check (500 minutes for M5)
@@ -87,8 +87,8 @@
           symbol: signal.symbol,
           direction: signal.direction,
           entry: signal.entry,
-          tpA: signal.tpA,
-          tpB: signal.tpB,
+          tp1: signal.tp1,
+          tp2: signal.tp2,
           sl: signal.sl
         });
 
@@ -190,24 +190,24 @@
 
           // For BUY signal — check TP before SL (TP wins on same-bar touch)
           if (signal.direction === 'BUY') {
-            // Check tpA first
-            if (signal.tpA != null && signal.tpA !== 0) {
-              if (candle.high >= signal.tpA) {
-                debugLog('HIT_TPA', `BUY signal hit tpA at ${signal.tpA}`, {
+            // Check tp1 first
+            if (signal.tp1 != null && signal.tp1 !== 0) {
+              if (candle.high >= signal.tp1) {
+                debugLog('HIT_TP1', `BUY signal hit tp1 at ${signal.tp1}`, {
                   candle_high: candle.high,
                   bar_time: candle.time
                 });
-                // Continue checking for tpB in same or later candles
+                // Continue checking for tp2 in same or later candles
                 for (let j = i; j < candles.length; j++) {
-                  if (signal.tpB != null && signal.tpB !== 0 && candles[j].high >= signal.tpB) {
-                    debugLog('HIT_TPB', `BUY signal hit tpB at ${signal.tpB}`, {
+                  if (signal.tp2 != null && signal.tp2 !== 0 && candles[j].high >= signal.tp2) {
+                    debugLog('HIT_TP2', `BUY signal hit tp2 at ${signal.tp2}`, {
                       candle_high: candles[j].high,
                       bar_time: candles[j].time
                     });
-                    return { outcome: 'hitTpB', bar_time: candles[j].time };
+                    return { outcome: 'hitTp2', bar_time: candles[j].time };
                   }
                 }
-                return { outcome: 'hitTpA', bar_time: candle.time };
+                return { outcome: 'hitTp1', bar_time: candle.time };
               }
             }
             // Check SL
@@ -223,24 +223,24 @@
           }
           // For SELL signal — check TP before SL
           else if (signal.direction === 'SELL') {
-            // Check tpA first
-            if (signal.tpA != null && signal.tpA !== 0) {
-              if (candle.low <= signal.tpA) {
-                debugLog('HIT_TPA', `SELL signal hit tpA at ${signal.tpA}`, {
+            // Check tp1 first
+            if (signal.tp1 != null && signal.tp1 !== 0) {
+              if (candle.low <= signal.tp1) {
+                debugLog('HIT_TP1', `SELL signal hit tp1 at ${signal.tp1}`, {
                   candle_low: candle.low,
                   bar_time: candle.time
                 });
-                // Continue checking for tpB
+                // Continue checking for tp2
                 for (let j = i; j < candles.length; j++) {
-                  if (signal.tpB != null && signal.tpB !== 0 && candles[j].low <= signal.tpB) {
-                    debugLog('HIT_TPB', `SELL signal hit tpB at ${signal.tpB}`, {
+                  if (signal.tp2 != null && signal.tp2 !== 0 && candles[j].low <= signal.tp2) {
+                    debugLog('HIT_TP2', `SELL signal hit tp2 at ${signal.tp2}`, {
                       candle_low: candles[j].low,
                       bar_time: candles[j].time
                     });
-                    return { outcome: 'hitTpB', bar_time: candles[j].time };
+                    return { outcome: 'hitTp2', bar_time: candles[j].time };
                   }
                 }
-                return { outcome: 'hitTpA', bar_time: candle.time };
+                return { outcome: 'hitTp1', bar_time: candle.time };
               }
             }
             // Check SL
@@ -281,10 +281,10 @@
         );
 
         const total = symbolSignals.length;
-        const tpA = symbolSignals.filter(s => s.outcome === 'hitTpA').length;
-        const tpB = symbolSignals.filter(s => s.outcome === 'hitTpB').length;
+        const tp1 = symbolSignals.filter(s => s.outcome === 'hitTp1').length;
+        const tp2 = symbolSignals.filter(s => s.outcome === 'hitTp2').length;
         const sl = symbolSignals.filter(s => s.outcome === 'SL').length;
-        const wins = tpA + tpB;
+        const wins = tp1 + tp2;
         const winRate = total > 0 ? ((wins / total) * 100).toFixed(1) : 0;
         const pending = trackedSignals.filter(s =>
           s.symbol === symbol && !s.tracked
@@ -293,8 +293,8 @@
         debugLog('STATS', `Calculated stats for ${symbol}`, {
           total,
           wins,
-          tpA,
-          tpB,
+          tp1,
+          tp2,
           sl,
           winRate,
           pending
@@ -324,12 +324,10 @@
         if (stored) {
           const allSignals = JSON.parse(stored);
 
-          // Migrate old tp1/tp2 keys → tpA/tpB and TP1/TP2 outcomes → hitTpA/hitTpB
+          // Migrate legacy outcome strings
           for (const s of allSignals) {
-            if (s.tpA == null && s.tp1 != null) { s.tpA = s.tp1; delete s.tp1; }
-            if (s.tpB == null && s.tp2 != null) { s.tpB = s.tp2; delete s.tp2; }
-            if (s.outcome === 'TP1') s.outcome = 'hitTpA';
-            if (s.outcome === 'TP2') s.outcome = 'hitTpB';
+            if (s.outcome === 'TP1') s.outcome = 'hitTp1';
+            if (s.outcome === 'TP2') s.outcome = 'hitTp2';
           }
 
           // Filter to last 30 days
@@ -694,8 +692,8 @@
           signal: s.direction, // BUY or SELL
           price: s.price,
           sl: s.sl,
-          tpA: s.tpA ?? s.tp1,
-          tpB: s.tpB ?? s.tp2,
+          tp1: s.tp1,
+          tp2: s.tp2,
           last_bar: s.bar_time,
           symbol: sym,
           model_used: s.model || '--',
@@ -705,11 +703,11 @@
         const added = SignalTracker.addSignal(signal);
         if (added) {
           addedCount++;
-          // Apply server-side outcome if available (migrate old TP1/TP2 → hitTpA/hitTpB)
+          // Apply server-side outcome if available (migrate old TP1/TP2 → hitTp1/hitTp2)
           if (s.outcome) {
             let outcome = s.outcome;
-            if (outcome === 'TP1') outcome = 'hitTpA';
-            if (outcome === 'TP2') outcome = 'hitTpB';
+            if (outcome === 'TP1') outcome = 'hitTp1';
+            if (outcome === 'TP2') outcome = 'hitTp2';
             added.outcome = outcome;
             added.tracked = true;
           }
@@ -847,10 +845,10 @@
         if (!sig.tracked || !sig.outcome || sig.outcome.includes('Pending')) continue;
         const entry = sig.entry;
         if (!entry || !pipSize) continue;
-        if (sig.outcome === 'hitTpA' && sig.tpA) {
-          pnlPips += (sig.direction === 'BUY' ? sig.tpA - entry : entry - sig.tpA) / pipSize;
-        } else if (sig.outcome === 'hitTpB' && sig.tpB) {
-          pnlPips += (sig.direction === 'BUY' ? sig.tpB - entry : entry - sig.tpB) / pipSize;
+        if (sig.outcome === 'hitTp1' && sig.tp1) {
+          pnlPips += (sig.direction === 'BUY' ? sig.tp1 - entry : entry - sig.tp1) / pipSize;
+        } else if (sig.outcome === 'hitTp2' && sig.tp2) {
+          pnlPips += (sig.direction === 'BUY' ? sig.tp2 - entry : entry - sig.tp2) / pipSize;
         } else if (sig.outcome === 'SL' && sig.sl) {
           pnlPips += (sig.direction === 'BUY' ? sig.sl - entry : entry - sig.sl) / pipSize;
         }
@@ -1066,8 +1064,8 @@
     const dec = getDecimals(currentSymbol);
     priceEntry.textContent = sig.price != null ? sig.price.toFixed(dec) : '--';
     priceSL.textContent    = (sig.sl != null && sig.sl !== 0)  ? sig.sl.toFixed(dec)  : (dir !== 'HOLD' ? 'Trail' : '--');
-    priceTP1.textContent   = (sig.tpA != null && sig.tpA !== 0) ? sig.tpA.toFixed(dec) : '--';
-    priceTP2.textContent   = (sig.tpB != null && sig.tpB !== 0) ? sig.tpB.toFixed(dec) : '--';
+    priceTP1.textContent   = (sig.tp1 != null && sig.tp1 !== 0) ? sig.tp1.toFixed(dec) : '--';
+    priceTP2.textContent   = (sig.tp2 != null && sig.tp2 !== 0) ? sig.tp2.toFixed(dec) : '--';
 
     // Probabilities
     const bp = (sig.buy_prob  || 0) * 100;
@@ -1153,8 +1151,8 @@
       signal:   sig.signal,
       entry:    sig.price != null ? sig.price.toFixed(dec) : '--',
       sl:       (sig.sl != null && sig.sl !== 0)   ? sig.sl.toFixed(dec)  : 'Trail',
-      tpA:      (sig.tpA != null && sig.tpA !== 0) ? sig.tpA.toFixed(dec) : '--',
-      tpB:      (sig.tpB != null && sig.tpB !== 0) ? sig.tpB.toFixed(dec) : '--',
+      tp1:      (sig.tp1 != null && sig.tp1 !== 0) ? sig.tp1.toFixed(dec) : '--',
+      tp2:      (sig.tp2 != null && sig.tp2 !== 0) ? sig.tp2.toFixed(dec) : '--',
       strength: sig.strength_label || '--',
       outcome:  outcome,
       outcomeClass: outcomeClass,
@@ -1176,9 +1174,9 @@
         <td><span class="sig-badge ${h.signal.toLowerCase()}">${h.signal}</span></td>
         <td>${h.entry}</td>
         <td>${h.sl}</td>
-        <td>${h.tpA}</td>
-        <td>${h.tpB}</td>
-        <td><span class="sig-badge ${h.outcomeClass}">${h.outcome}</span></td>
+        <td>${h.tp1}</td>
+        <td>${h.tp2}</td>
+        <td><span class="sig-badge ${h.outcomeClass}">${h.outcome === 'hitTp1' ? 'tp1' : h.outcome === 'hitTp2' ? 'tp2' : h.outcome}</span></td>
         <td>${h.strength}</td>
       </tr>
     `).join('');
