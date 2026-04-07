@@ -24,7 +24,7 @@
   let sparkTimer    = null;
   let connected     = false;
   let backfilledSymbols = new Set(); // Track which symbols have been backfilled
-  let allSignalsCache = {};          // Latest signals for all symbols (from /v4/public/signals)
+  let allSignalsCache = {};          // Latest signals for all symbols (from /v6/public/signals)
   let sparklineCache  = {};          // 7-day PnL data keyed by symbol
   let errorHistory    = [];          // Last 5 errors
   let errorPanelOpen  = false;
@@ -548,7 +548,7 @@
   async function fetchCandles(gen) {
     try {
       const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/candles/${sym}?limit=300`);
+      const resp = await fetch(`${BRIDGE_URL}/v6/public/candles/${sym}?limit=300`);
       if (gen !== undefined && gen !== switchId) return;  // stale
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -569,7 +569,7 @@
   // ── Fetch Signal ────────────────────────────────────────────────────
   async function fetchSignal(gen) {
     try {
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals`);
+      const resp = await fetch(`${BRIDGE_URL}/v6/public/signals`);
       if (gen !== undefined && gen !== switchId) return;  // stale
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -649,7 +649,7 @@
       const maxRetries = 3;
 
       for (let attempt = 0; attempt < maxRetries; attempt++) {
-        const url = `${BRIDGE_URL}/v4/public/signals/${sym}/history?limit=${limit}&days=${days}`;
+        const url = `${BRIDGE_URL}/v6/public/signals/${sym}/history?limit=${limit}&days=${days}`;
         const resp = await fetch(url);
 
         if (!resp.ok) {
@@ -736,7 +736,7 @@
   async function fetchHistory(gen) {
     try {
       const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/signals/${sym}/history?limit=5`);
+      const resp = await fetch(`${BRIDGE_URL}/v6/public/signals/${sym}/history?limit=5`);
       if (gen !== undefined && gen !== switchId) return;  // stale
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -756,7 +756,7 @@
   async function fetchTradeHistory(gen) {
     try {
       const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/${sym}/history?limit=50&days=30`);
+      const resp = await fetch(`${BRIDGE_URL}/v6/public/trades/${sym}/history?limit=50&days=30`);
       if (gen !== undefined && gen !== switchId) return;  // stale
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -786,7 +786,7 @@
         dates.push(d.toISOString().split('T')[0]);
       }
       const dailyResults = await Promise.all(dates.map(dt =>
-        fetch(`${BRIDGE_URL}/v4/public/stats/daily?symbol=${sym}&dt=${dt}`)
+        fetch(`${BRIDGE_URL}/v6/public/stats/daily?symbol=${sym}&dt=${dt}`)
           .then(r => r.ok ? r.json() : null)
           .then(json => json && json[sym] ? json[sym] : null)
           .catch(() => null)
@@ -885,7 +885,7 @@
   async function fetchTradeStats(gen) {
     try {
       const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/daily-stats?symbol=${sym}&days=30`);
+      const resp = await fetch(`${BRIDGE_URL}/v6/public/trades/daily-stats?symbol=${sym}&days=30`);
       if (gen !== undefined && gen !== switchId) return;
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -914,7 +914,7 @@
   async function fetchTradeSummary(gen) {
     try {
       const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/trades/${sym}/summary?days=30`);
+      const resp = await fetch(`${BRIDGE_URL}/v6/public/trades/${sym}/summary?days=30`);
       if (gen !== undefined && gen !== switchId) return;
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
@@ -931,7 +931,7 @@
   async function fetchJournalStats(gen) {
     try {
       const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v4/public/journal/stats?symbol=${sym}&days=30`);
+      const resp = await fetch(`${BRIDGE_URL}/v6/public/journal/stats?symbol=${sym}&days=30`);
       if (gen !== undefined && gen !== switchId) return;
       if (!resp.ok) return; // endpoint may not exist on older bridge — skip silently
       const data = await resp.json();
@@ -979,7 +979,7 @@
       d.setDate(d.getDate() - i);
       const dt = d.toISOString().split('T')[0];
       fetches.push(
-        fetch(`${BRIDGE_URL}/v4/public/stats/daily?symbol=${sym}&dt=${dt}`)
+        fetch(`${BRIDGE_URL}/v6/public/stats/daily?symbol=${sym}&dt=${dt}`)
           .then(r => r.ok ? r.json() : null)
           .then(json => json && json[sym] ? json[sym].pnl_pips || 0 : 0)
           .catch(() => 0)
