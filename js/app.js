@@ -610,8 +610,8 @@
   function renderOverviewGrid() {
     const grid = $('overviewGrid');
     if (!grid) return;
-    const symbols = ['XAUUSD', 'BTCUSD'];
-    const names   = {XAUUSD:'Gold', BTCUSD:'BTC'};
+    const symbols = ['XAUUSD', 'BTCUSD', 'XAGUSD'];
+    const names   = {XAUUSD:'Gold', BTCUSD:'BTC', XAGUSD:'Silver'};
     grid.innerHTML = symbols.map(sym => {
       const sig = allSignalsCache[sym];
       const dir = sig ? (sig.signal || 'HOLD') : '?';
