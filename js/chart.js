@@ -72,10 +72,10 @@ const ChartManager = (() => {
         borderColor: '#2a2a5a',
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 5,
+        rightOffset: 8,
       },
-      handleScale: { axisPressedMouseMove: { time: true, price: true } },
-      handleScroll: { vertTouchDrag: true },
+      handleScale: { axisPressedMouseMove: { time: true, price: true }, mouseWheel: false },
+      handleScroll: { mouseWheel: false, vertTouchDrag: false },
     });
 
     candleSeries = chart.addCandlestickSeries({
@@ -176,6 +176,10 @@ const ChartManager = (() => {
       tooltip.style.display = 'block';
     });
 
+    // Prevent mouse wheel on chart from scrolling the page
+    container.addEventListener('wheel', e => { e.preventDefault(); }, { passive: false });
+    container.addEventListener('touchmove', e => { e.preventDefault(); }, { passive: false });
+
     // Responsive resize
     const ro = new ResizeObserver(entries => {
       for (const entry of entries) {
@@ -196,7 +200,16 @@ const ChartManager = (() => {
     candleSeries.setData(candles);
     _mergeAndSetMarkers();
     candleSeries.priceScale().applyOptions({ autoScale: true });
-    chart.timeScale().fitContent();
+    // Show last 30 bars zoomed in, shifted left
+    if (candles.length > 0) {
+      const fromIdx = Math.max(0, candles.length - 30);
+      chart.timeScale().setVisibleRange({
+        from: candles[fromIdx].time,
+        to: candles[candles.length - 1].time,
+      });
+    } else {
+      chart.timeScale().fitContent();
+    }
   }
 
   function addCandle(candle) {
