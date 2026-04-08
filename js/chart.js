@@ -72,10 +72,10 @@ const ChartManager = (() => {
         borderColor: '#2a2a5a',
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 8,
+        rightOffset: 60,
       },
-      handleScale: { axisPressedMouseMove: { time: true, price: true }, mouseWheel: false },
-      handleScroll: { mouseWheel: false, vertTouchDrag: false },
+      handleScale: { axisPressedMouseMove: { time: true, price: false }, mouseWheel: false },
+      handleScroll: { mouseWheel: true, pressedMouseMove: { time: true, price: false }, horzTouchDrag: true, vertTouchDrag: false },
     });
 
     candleSeries = chart.addCandlestickSeries({
@@ -176,9 +176,13 @@ const ChartManager = (() => {
       tooltip.style.display = 'block';
     });
 
-    // Prevent mouse wheel on chart from scrolling the page
-    container.addEventListener('wheel', e => { e.preventDefault(); }, { passive: false });
-    container.addEventListener('touchmove', e => { e.preventDefault(); }, { passive: false });
+    // Allow horizontal wheel scroll on chart, pass vertical scroll to page
+    container.addEventListener('wheel', e => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault(); // horizontal — let chart handle it
+      }
+      // vertical — do nothing, page scrolls normally
+    }, { passive: false });
 
     // Responsive resize
     const ro = new ResizeObserver(entries => {
