@@ -123,12 +123,11 @@ a:hover { color: #818cf8; }
 /* ═══ STATS BANNER ═══ */
 .stats-banner { padding: 0 0 16px; }
 
-/* Two-column layout: signal box left, trade box right */
+/* Stacked layout: signal box on top, trade box below */
 .stats-boxes {
   display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-items: flex-start;
-  flex-wrap: wrap;
 }
 
 .stats-box {
@@ -242,7 +241,6 @@ a:hover { color: #818cf8; }
 }
 
 @media (max-width: 700px) {
-  .stats-boxes { flex-direction: column; }
   .stats-box { width: 100%; }
 }
 
@@ -544,7 +542,7 @@ a:hover { color: #818cf8; }
 .overview-section { padding: 20px 0 12px; }
 .overview-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
 }
 .ov-card {
@@ -611,16 +609,16 @@ a:hover { color: #818cf8; }
   flex-shrink: 0;
 }
 @media (max-width: 900px) {
-  .overview-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .overview-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
   .ov-card { padding: 8px 8px; }
 }
 @media (max-width: 600px) {
-  .overview-grid { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .overview-grid { grid-template-columns: repeat(2, 1fr); gap: 4px; }
   .ov-sym { font-size: 0.65rem; }
   .ov-price { display: none; }
 }
 @media (max-width: 400px) {
-  .overview-grid { grid-template-columns: repeat(4, 1fr); }
+  .overview-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ═══ SIGNAL REASON ═══ */
