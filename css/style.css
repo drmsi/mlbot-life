@@ -124,133 +124,91 @@ a:hover { color: #818cf8; }
 .stats-banner { padding: 0 0 16px; }
 
 /* Stacked layout: signal box on top, trade box below */
-.stats-boxes {
-  display: flex;
-  flex-direction: column;
+/* ── Symbol Dashboard Grid: 2 columns ── */
+.sym-dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-
-.stats-box {
+.sym-dash-col {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px 16px;
-  flex: 1 1 auto;
+  padding: 12px;
   min-width: 0;
+  overflow: hidden;
 }
-
-/* Signal Performance — purple/indigo accent */
-.stats-box-signals {
-  background: rgba(99,102,241,0.06);
-  border: 1px solid rgba(99,102,241,0.28);
-}
-
-/* Trade Execution — blue accent */
-.stats-box-trades {
-  background: rgba(59,130,246,0.06);
-  border: 1px solid rgba(59,130,246,0.28);
-}
-
-.stats-box-header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+.sym-dash-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  letter-spacing: 1px;
   margin-bottom: 10px;
+  text-align: center;
 }
-.stats-box-title {
-  font-size: 0.75rem;
+.sym-dash-section {
+  margin-bottom: 8px;
+}
+.sym-dash-section:last-child { margin-bottom: 0; }
+.sym-dash-section-title {
+  font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
+  margin-bottom: 6px;
 }
-.stats-box-signals .stats-box-title { color: #818cf8; }
-.stats-box-trades  .stats-box-title { color: #60a5fa; }
-.stats-box-period {
-  font-size: 0.65rem;
+.sym-dash-section-signals .sym-dash-section-title { color: #818cf8; }
+.sym-dash-section-trades  .sym-dash-section-title { color: #60a5fa; }
+.sym-dash-period {
+  font-size: 0.55rem;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  margin-left: 4px;
 }
 
-.stats-row {
+/* KPI row inside each section — never wrap */
+.sym-kpi-row {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
 }
 
-/* KPI tiles inside each box — no own background, blend into box */
-.stats-kpi {
+/* KPI tiles — scale to fit container */
+.sym-kpi {
+  flex: 1 1 0;
+  min-width: 0;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: var(--radius-sm);
-  padding: 8px 14px;
+  padding: 6px 4px;
   text-align: center;
-  min-width: 72px;
+  overflow: hidden;
 }
-.kpi-value {
+.sym-kpi-value {
   display: block;
-  font-size: 1.15rem;
+  font-size: clamp(0.7rem, 1.8vw, 1.1rem);
   font-weight: 700;
   font-family: var(--font-mono);
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.kpi-label {
+.sym-kpi-label {
   display: block;
-  font-size: 0.6rem;
+  font-size: clamp(0.45rem, 1vw, 0.58rem);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-top: 2px;
-}
-.kpi-sublabel {
-  display: block;
-  font-size: 0.6rem;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
   margin-top: 1px;
+  white-space: nowrap;
 }
-.kpi-green .kpi-value { color: var(--buy); }
-.kpi-red   .kpi-value { color: var(--sell); }
-.kpi-wr-good .kpi-value     { color: var(--buy); }
-.kpi-wr-bad  .kpi-value     { color: var(--sell); }
-.kpi-pnl-pos .kpi-value     { color: var(--buy); }
-.kpi-pnl-neg .kpi-value     { color: var(--sell); }
-.kpi-trade-wr-good .kpi-value  { color: var(--buy); }
-.kpi-trade-wr-bad  .kpi-value  { color: var(--sell); }
-.kpi-trade-pnl-pos .kpi-value  { color: var(--buy); }
-.kpi-trade-pnl-neg .kpi-value  { color: var(--sell); }
-
-/* Multi-symbol perf rows */
-.perf-sym-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
-  padding: 6px 0;
-}
-.perf-sym-row + .perf-sym-row {
-  border-top: 1px solid rgba(255,255,255,0.06);
-}
-.perf-sym-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  min-width: 62px;
-  letter-spacing: 0.5px;
-}
-
-/* EA Activity / Journal row */
-.stats-row-journal {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid rgba(255,255,255,0.06);
-}
-.stats-kpi-sm {
-  min-width: 60px;
-  padding: 5px 10px;
-}
-.kpi-value-sm {
-  font-size: 0.95rem;
-}
+.sym-kpi.kpi-green .sym-kpi-value { color: var(--buy); }
+.sym-kpi.kpi-red   .sym-kpi-value { color: var(--sell); }
+.sym-kpi.kpi-wr-good .sym-kpi-value { color: var(--buy); }
+.sym-kpi.kpi-wr-bad  .sym-kpi-value { color: var(--sell); }
+.sym-kpi.kpi-pnl-pos .sym-kpi-value { color: var(--buy); }
+.sym-kpi.kpi-pnl-neg .sym-kpi-value { color: var(--sell); }
 .kpi-journal-label {
   display: block;
   font-size: 0.55rem;
@@ -261,7 +219,7 @@ a:hover { color: #818cf8; }
 }
 
 @media (max-width: 700px) {
-  .stats-box { width: 100%; }
+  .sym-dash-grid { grid-template-columns: 1fr; }
 }
 
 /* ═══ DASHBOARD GRID ═══ */
@@ -551,8 +509,8 @@ a:hover { color: #818cf8; }
   .history-table th, .history-table td { padding: 8px 6px; }
   .features-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
   .feature-card { padding: 16px; }
-  .stats-kpi { min-width: 70px; padding: 8px 10px; }
-  .kpi-value { font-size: 1rem; }
+  .sym-kpi { padding: 4px 2px; }
+  .sym-kpi-value { font-size: 0.75rem; }
 }
 @media (max-width: 400px) {
   .features-grid { grid-template-columns: 1fr; }

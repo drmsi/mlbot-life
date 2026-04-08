@@ -79,33 +79,12 @@
     </div>
   </section>
 
-  <!-- ═══ STATS BANNER ═══ -->
+  <!-- ═══ STATS DASHBOARD ═══ -->
   <section class="stats-banner">
-    <div class="container stats-boxes">
-
-      <!-- Signal Performance box — all symbols -->
-      <div class="stats-box stats-box-signals">
-        <div class="stats-box-header">
-          <span class="stats-box-title">Signal Performance</span>
-          <span class="stats-box-period">30 days</span>
-        </div>
-        <div id="signalPerfGrid">
-          <!-- populated by JS: one row per symbol -->
-        </div>
-        <div id="statsErrorBadge" class="stats-error-badge" style="display:none"></div>
+    <div class="container">
+      <div class="sym-dash-grid" id="symDashGrid">
+        <!-- populated by JS: two columns, one per symbol -->
       </div>
-
-      <!-- Trade Execution box — all symbols -->
-      <div class="stats-box stats-box-trades" id="tradeStatsRow">
-        <div class="stats-box-header">
-          <span class="stats-box-title">Trade Execution</span>
-          <span class="stats-box-period">30 days</span>
-        </div>
-        <div id="tradePerfGrid">
-          <!-- populated by JS: one row per symbol -->
-        </div>
-      </div>
-
     </div>
   </section>
 

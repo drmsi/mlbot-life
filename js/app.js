@@ -721,11 +721,61 @@
   // ── All-symbols stats (signal performance + trade execution) ─────
   const ALL_STATS_SYMBOLS = ['XAUUSD', 'BTCUSD'];
 
-  async function fetchAllStats() {
-    const grid = $('signalPerfGrid');
-    if (!grid) return;
+  // Render signal KPI row HTML for one symbol
+  function _signalKpiRow(r) {
+    const wrClass = r.wr >= 50 ? 'kpi-wr-good' : (r.total > 0 ? 'kpi-wr-bad' : '');
+    const pnlClass = r.pnl >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg';
+    const pnlText = r.total > 0 ? ((r.pnl >= 0 ? '+' : '') + r.pnl.toFixed(0)) : '--';
+    return `<div class="sym-kpi-row">
+      <div class="sym-kpi"><span class="sym-kpi-value">${r.total || '--'}</span><span class="sym-kpi-label">Signals</span></div>
+      <div class="sym-kpi ${wrClass}"><span class="sym-kpi-value">${r.total > 0 ? r.wr + '%' : '--'}</span><span class="sym-kpi-label">Win Rate</span></div>
+      <div class="sym-kpi kpi-green"><span class="sym-kpi-value">${r.total > 0 ? r.tp : '--'}</span><span class="sym-kpi-label">TP</span></div>
+      <div class="sym-kpi kpi-red"><span class="sym-kpi-value">${r.total > 0 ? r.sl : '--'}</span><span class="sym-kpi-label">SL</span></div>
+      <div class="sym-kpi ${r.total > 0 ? pnlClass : ''}"><span class="sym-kpi-value">${pnlText}</span><span class="sym-kpi-label">P&L</span></div>
+      <div class="sym-kpi"><span class="sym-kpi-value">${r.total > 0 ? r.pending : '--'}</span><span class="sym-kpi-label">Pending</span></div>
+    </div>`;
+  }
 
-    const rows = [];
+  // Render trade KPI row HTML for one symbol
+  function _tradeKpiRow(r) {
+    const wrClass = r.positions > 0 ? (r.wr >= 50 ? 'kpi-wr-good' : 'kpi-wr-bad') : '';
+    const pnlClass = r.positions > 0 ? (r.pnl >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg') : '';
+    const pnlText = r.positions > 0 ? ((r.pnl >= 0 ? '+$' : '-$') + Math.abs(r.pnl).toFixed(2)) : '--';
+    return `<div class="sym-kpi-row">
+      <div class="sym-kpi"><span class="sym-kpi-value">${r.positions || '--'}</span><span class="sym-kpi-label">Positions</span></div>
+      <div class="sym-kpi ${wrClass}"><span class="sym-kpi-value">${r.positions > 0 ? r.wr + '%' : '--'}</span><span class="sym-kpi-label">Win Rate</span></div>
+      <div class="sym-kpi kpi-green"><span class="sym-kpi-value">${r.positions > 0 ? r.wins : '--'}</span><span class="sym-kpi-label">Wins</span></div>
+      <div class="sym-kpi kpi-red"><span class="sym-kpi-value">${r.positions > 0 ? r.losses : '--'}</span><span class="sym-kpi-label">Losses</span></div>
+      <div class="sym-kpi ${pnlClass}"><span class="sym-kpi-value">${pnlText}</span><span class="sym-kpi-label">P&L $</span></div>
+      <div class="sym-kpi"><span class="sym-kpi-value">${r.pf != null ? r.pf.toFixed(2) : '--'}</span><span class="sym-kpi-label">PF</span></div>
+    </div>`;
+  }
+
+  // Cached per-symbol data for grid render
+  let _sigData = {};
+  let _tradeData = {};
+
+  function _renderDashGrid() {
+    const grid = $('symDashGrid');
+    if (!grid) return;
+    grid.innerHTML = ALL_STATS_SYMBOLS.map(sym => {
+      const sig = _sigData[sym] || { sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
+      const tr = _tradeData[sym] || { sym, positions: 0, wr: 0, wins: 0, losses: 0, pnl: 0, pf: null };
+      return `<div class="sym-dash-col">
+        <div class="sym-dash-title">${sym}</div>
+        <div class="sym-dash-section sym-dash-section-signals">
+          <div class="sym-dash-section-title">Signal Performance <span class="sym-dash-period">30d</span></div>
+          ${_signalKpiRow(sig)}
+        </div>
+        <div class="sym-dash-section sym-dash-section-trades">
+          <div class="sym-dash-section-title">Trade Execution <span class="sym-dash-period">30d</span></div>
+          ${_tradeKpiRow(tr)}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function fetchAllStats() {
     for (const sym of ALL_STATS_SYMBOLS) {
       try {
         const today = new Date();
@@ -750,34 +800,15 @@
         }
         const wr = completed > 0 ? Math.round((tp / completed) * 1000) / 10 : 0;
         pnl = Math.round(pnl * 100) / 100;
-        rows.push({ sym, total, tp, sl, pending, wr, pnl });
+        _sigData[sym] = { sym, total, tp, sl, pending, wr, pnl };
       } catch (err) {
-        rows.push({ sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 });
+        _sigData[sym] = { sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
       }
     }
-
-    grid.innerHTML = rows.map(r => {
-      const wrClass = r.wr >= 50 ? 'kpi-wr-good' : (r.total > 0 ? 'kpi-wr-bad' : '');
-      const pnlClass = r.pnl >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg';
-      const pnlText = r.total > 0 ? ((r.pnl >= 0 ? '+' : '') + r.pnl.toFixed(0)) : '--';
-      return `<div class="perf-sym-row">
-        <span class="perf-sym-label">${r.sym}</span>
-        <div class="stats-kpi"><span class="kpi-value">${r.total || '--'}</span><span class="kpi-label">Signals</span></div>
-        <div class="stats-kpi ${wrClass}"><span class="kpi-value">${r.total > 0 ? r.wr + '%' : '--'}</span><span class="kpi-label">Win Rate</span></div>
-        <div class="stats-kpi kpi-green"><span class="kpi-value">${r.total > 0 ? r.tp : '--'}</span><span class="kpi-label">TP</span></div>
-        <div class="stats-kpi kpi-red"><span class="kpi-value">${r.total > 0 ? r.sl : '--'}</span><span class="kpi-label">SL</span></div>
-        <div class="stats-kpi ${r.total > 0 ? pnlClass : ''}"><span class="kpi-value">${pnlText}</span><span class="kpi-label">P&L</span></div>
-        <div class="stats-kpi"><span class="kpi-value">${r.total > 0 ? r.pending : '--'}</span><span class="kpi-label">Pending</span></div>
-      </div>`;
-    }).join('');
-    if (statsErrorBadge) statsErrorBadge.style.display = 'none';
+    _renderDashGrid();
   }
 
   async function fetchAllTradeStats() {
-    const grid = $('tradePerfGrid');
-    if (!grid) return;
-
-    const rows = [];
     for (const sym of ALL_STATS_SYMBOLS) {
       try {
         const [tsResp, sumResp] = await Promise.all([
@@ -787,7 +818,7 @@
         const ts = tsResp && tsResp[sym] ? tsResp[sym] : null;
         const stats = sumResp && sumResp.stats ? sumResp.stats : {};
         const pf = stats.profit_factor ?? stats.pf;
-        rows.push({
+        _tradeData[sym] = {
           sym,
           positions: ts ? ts.positions : 0,
           wr: ts ? ts.win_rate : 0,
@@ -795,26 +826,12 @@
           losses: ts ? ts.losses : 0,
           pnl: ts ? ts.net_pnl : 0,
           pf: pf,
-        });
+        };
       } catch (err) {
-        rows.push({ sym, positions: 0, wr: 0, wins: 0, losses: 0, pnl: 0, pf: null });
+        _tradeData[sym] = { sym, positions: 0, wr: 0, wins: 0, losses: 0, pnl: 0, pf: null };
       }
     }
-
-    grid.innerHTML = rows.map(r => {
-      const wrClass = r.positions > 0 ? (r.wr >= 50 ? 'kpi-trade-wr-good' : 'kpi-trade-wr-bad') : '';
-      const pnlClass = r.positions > 0 ? (r.pnl >= 0 ? 'kpi-trade-pnl-pos' : 'kpi-trade-pnl-neg') : '';
-      const pnlText = r.positions > 0 ? ((r.pnl >= 0 ? '+$' : '-$') + Math.abs(r.pnl).toFixed(2)) : '--';
-      return `<div class="perf-sym-row">
-        <span class="perf-sym-label">${r.sym}</span>
-        <div class="stats-kpi"><span class="kpi-value">${r.positions || '--'}</span><span class="kpi-label">Positions</span></div>
-        <div class="stats-kpi ${wrClass}"><span class="kpi-value">${r.positions > 0 ? r.wr + '%' : '--'}</span><span class="kpi-label">Win Rate</span></div>
-        <div class="stats-kpi kpi-green"><span class="kpi-value">${r.positions > 0 ? r.wins : '--'}</span><span class="kpi-label">Wins</span></div>
-        <div class="stats-kpi kpi-red"><span class="kpi-value">${r.positions > 0 ? r.losses : '--'}</span><span class="kpi-label">Losses</span></div>
-        <div class="stats-kpi ${pnlClass}"><span class="kpi-value">${pnlText}</span><span class="kpi-label">P&L $</span></div>
-        <div class="stats-kpi"><span class="kpi-value">${r.pf != null ? r.pf.toFixed(2) : '--'}</span><span class="kpi-label">Prof. Factor</span></div>
-      </div>`;
-    }).join('');
+    _renderDashGrid();
   }
 
   // ── Update Signal Panel ─────────────────────────────────────────────
