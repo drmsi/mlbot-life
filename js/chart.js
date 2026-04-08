@@ -167,12 +167,8 @@ const ChartManager = (() => {
         ${match.exit_price != null ? `<div class="tt-row"><span>Exit</span><span>${match.exit_price.toFixed(dec)}</span></div>` : ''}
       `;
       const chartRect = container.getBoundingClientRect();
-      let left = param.point.x + chartRect.left + 16;
-      let top = param.point.y + chartRect.top - 60;
-      if (left + 220 > window.innerWidth) left = param.point.x + chartRect.left - 230;
-      if (top < 0) top = 10;
-      tooltip.style.left = left + 'px';
-      tooltip.style.top = top + 'px';
+      tooltip.style.left = (chartRect.left + 8) + 'px';
+      tooltip.style.top = (chartRect.top + 8) + 'px';
       tooltip.style.display = 'block';
     });
 
@@ -435,12 +431,8 @@ const ChartManager = (() => {
       <div class="tt-row"><span>Duration</span><span>${duration}</span></div>
     `;
     const chartRect = container.getBoundingClientRect();
-    let left = param.point.x + chartRect.left + 16;
-    let top = param.point.y + chartRect.top - 60;
-    if (left + 220 > window.innerWidth) left = param.point.x + chartRect.left - 230;
-    if (top < 0) top = 10;
-    tooltip.style.left = left + 'px';
-    tooltip.style.top = top + 'px';
+    tooltip.style.left = (chartRect.left + 8) + 'px';
+    tooltip.style.top = (chartRect.top + 8) + 'px';
     tooltip.style.display = 'block';
   }
 
