@@ -204,13 +204,14 @@ const ChartManager = (() => {
     candleSeries.setData(candles);
     _mergeAndSetMarkers();
     candleSeries.priceScale().applyOptions({ autoScale: true });
-    // Show last 30 bars zoomed in, shifted left
+    // Show last 30 bars, pushed to the left 1/3 of chart via setVisibleLogicalRange
     if (candles.length > 0) {
-      const fromIdx = Math.max(0, candles.length - 30);
-      chart.timeScale().setVisibleRange({
-        from: candles[fromIdx].time,
-        to: candles[candles.length - 1].time,
-      });
+      const barsToShow = 30;
+      const totalBars = candles.length;
+      const logicalFrom = totalBars - barsToShow;
+      // Add extra empty space on right (~half of visible bars) to push candles left
+      const logicalTo = totalBars - 1 + Math.round(barsToShow * 0.5);
+      chart.timeScale().setVisibleLogicalRange({ from: logicalFrom, to: logicalTo });
     } else {
       chart.timeScale().fitContent();
     }
