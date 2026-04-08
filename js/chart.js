@@ -74,8 +74,8 @@ const ChartManager = (() => {
         secondsVisible: false,
         rightOffset: 60,
       },
-      handleScale: { axisPressedMouseMove: { time: true, price: false }, mouseWheel: false },
-      handleScroll: { mouseWheel: true, pressedMouseMove: { time: true, price: false }, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { axisPressedMouseMove: true, mouseWheel: false },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
     });
 
     candleSeries = chart.addCandlestickSeries({
