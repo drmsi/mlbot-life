@@ -21,11 +21,9 @@
   let candleTimer   = null;
   let historyTimer  = null;
   let tradeTimer    = null;
-  let sparkTimer    = null;
   let connected     = false;
   let backfilledSymbols = new Set(); // Track which symbols have been backfilled
   let allSignalsCache = {};          // Latest signals for all symbols (from /v6/public/signals)
-  let sparklineCache  = {};          // 7-day PnL data keyed by symbol
   let errorHistory    = [];          // Last 5 errors
   let errorPanelOpen  = false;
 
@@ -428,28 +426,7 @@
   const detailH1     = $('detailH1');
   const detailRisk   = $('detailRisk');
   const historyBody  = $('historyBody');
-  const kpiSignals   = $('kpiSignals');
-  const kpiWR        = $('kpiWR');
-  const kpiTP        = $('kpiTP');
-  const kpiSL        = $('kpiSL');
-  const kpiPnL       = $('kpiPnL');
-  const kpiPending   = $('kpiPending');
-  // Trade execution KPIs
-  const kpiPositions   = $('kpiPositions');
-  const kpiTradeWR     = $('kpiTradeWR');
-  const kpiTradeWins   = $('kpiTradeWins');
-  const kpiTradeLosses = $('kpiTradeLosses');
-  const kpiTradePnL    = $('kpiTradePnL');
-  const kpiTradePF     = $('kpiTradePF');
-  const kpiAvgSlots    = $('kpiAvgSlotsInline');
-  // EA Journal KPIs (v5.36+)
-  const kpiJournalOpens    = $('kpiJournalOpens');
-  const kpiJournalSkips    = $('kpiJournalSkips');
-  const kpiJournalTimeouts = $('kpiJournalTimeouts');
-  const kpiJournalBE       = $('kpiJournalBE');
-  const kpiJournalCB       = $('kpiJournalCB');
-  const kpiJournalGate     = $('kpiJournalGate');
-  const journalActivityRow = $('journalActivityRow');
+  // Stats grids are rendered dynamically — no individual KPI refs needed
   // New fields
   const signalReasonWrap = $('signalReasonWrap');
   const signalReason     = $('signalReason');
@@ -469,25 +446,11 @@
     }
     ChartManager.init('chartContainer');
     renderOverviewGrid(); // show empty grid immediately
+    // Fetch all-symbols stats (independent of selected symbol)
+    fetchAllStats();
+    fetchAllTradeStats();
+    setInterval(() => { fetchAllStats(); fetchAllTradeStats(); }, CANDLE_POLL_MS);
     await switchSymbol('XAUUSD');
-  }
-
-  function resetTradeKPIs() {
-    if (kpiPositions)   kpiPositions.textContent   = '--';
-    if (kpiTradeWR)     kpiTradeWR.textContent      = '--';
-    if (kpiTradeWins)   kpiTradeWins.textContent    = '--';
-    if (kpiTradeLosses) kpiTradeLosses.textContent  = '--';
-    if (kpiTradePnL)    kpiTradePnL.textContent     = '--';
-    if (kpiTradePF)     kpiTradePF.textContent      = '--';
-    if (kpiAvgSlots)    kpiAvgSlots.textContent     = '';
-    if (kpiTradeWR)     kpiTradeWR.parentElement.className     = 'stats-kpi';
-    if (kpiTradePnL)    kpiTradePnL.parentElement.className    = 'stats-kpi';
-    if (kpiJournalOpens)    kpiJournalOpens.textContent    = '--';
-    if (kpiJournalSkips)    kpiJournalSkips.textContent    = '--';
-    if (kpiJournalTimeouts) kpiJournalTimeouts.textContent = '--';
-    if (kpiJournalBE)       kpiJournalBE.textContent       = '--';
-    if (kpiJournalCB)       kpiJournalCB.textContent       = '--';
-    if (kpiJournalGate)     kpiJournalGate.textContent     = '--';
   }
 
   async function switchSymbol(sym) {
@@ -497,7 +460,6 @@
     chartLastBar.textContent = '--';
     ChartManager.setSymbol(sym);
     resetSignalPanel();
-    resetTradeKPIs();
 
     // Clear history for the old symbol so stale rows don't bleed into new symbol view
     signalHistory = [];
@@ -515,15 +477,7 @@
     clearInterval(candleTimer);
     clearInterval(historyTimer);
     clearInterval(tradeTimer);
-    clearInterval(sparkTimer);
     // Fetch candles first, then signal + history + trades — all guarded by switchId
-    fetchStats(mySwitch);
-    fetchTradeStats(mySwitch);
-    fetchTradeSummary(mySwitch);
-    fetchJournalStats(mySwitch);
-    fetchSparklineData(sym).then(data => {
-      if (switchId === mySwitch) renderSparkline(data);
-    });
     fetchCandles(mySwitch).then(async () => {
       if (switchId !== mySwitch) return;  // symbol changed while fetching
       // fetchSignal must complete first so liveSignalTs is set before
@@ -534,12 +488,9 @@
       fetchTradeHistory(mySwitch);
     });
     pollTimer    = setInterval(() => fetchSignal(switchId),  POLL_INTERVAL_MS);
-    candleTimer  = setInterval(() => { fetchCandles(switchId); fetchStats(switchId); }, CANDLE_POLL_MS);
+    candleTimer  = setInterval(() => fetchCandles(switchId), CANDLE_POLL_MS);
     historyTimer = setInterval(() => fetchHistory(switchId), CANDLE_POLL_MS);
-    tradeTimer   = setInterval(() => { fetchTradeHistory(switchId); fetchTradeStats(switchId); fetchTradeSummary(switchId); fetchJournalStats(switchId); }, CANDLE_POLL_MS);
-    sparkTimer   = setInterval(() => {
-      fetchSparklineData(currentSymbol).then(data => { if (switchId !== undefined) renderSparkline(data); });
-    }, 5 * 60 * 1000); // refresh sparkline every 5 min
+    tradeTimer   = setInterval(() => fetchTradeHistory(switchId), CANDLE_POLL_MS);
   }
 
   // ── Fetch Candles ───────────────────────────────────────────────────
@@ -767,265 +718,103 @@
     }
   }
 
-  // ── Fetch Daily Stats ──────────────────────────────────────────────
-  async function fetchStats(gen) {
-    const sym = currentSymbol;
+  // ── All-symbols stats (signal performance + trade execution) ─────
+  const ALL_STATS_SYMBOLS = ['XAUUSD', 'BTCUSD'];
 
-    // Try server-side stats (Mon → today), aggregate week in parallel
-    let serverStats = null;
-    try {
-      const today = new Date();
-      const dow = today.getDay();                        // 0=Sun … 6=Sat
-      const daysSinceMon = dow === 0 ? 6 : dow - 1;     // Mon=0 … Sun=6
-      const dates = [];
-      for (let i = daysSinceMon; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(today.getDate() - i);
-        dates.push(d.toISOString().split('T')[0]);
-      }
-      const dailyResults = await Promise.all(dates.map(dt =>
-        fetch(`${BRIDGE_URL}/v6/public/stats/daily?symbol=${sym}&dt=${dt}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(json => json && json[sym] ? json[sym] : null)
-          .catch(() => null)
-      ));
-      if (gen !== undefined && gen !== switchId) return;
-      let total = 0, completed = 0, pending = 0, tp = 0, sl = 0, pnl = 0;
-      for (const r of dailyResults) {
-        if (!r) continue;
-        total     += r.total     || 0;
-        completed += r.completed || 0;
-        pending   += r.pending   || 0;
-        tp        += r.tp        || 0;
-        sl        += r.sl        || 0;
-        pnl       += r.pnl_pips  || 0;
-      }
-      if (total > 0) {
-        const win_rate = completed > 0 ? Math.round((tp / completed) * 1000) / 10 : 0;
-        serverStats = { total, completed, pending, tp, sl, win_rate, pnl_pips: Math.round(pnl * 100) / 100 };
-      }
-    } catch (err) {
-      // fall through to SignalTracker
-    }
-    if (gen !== undefined && gen !== switchId) return;
+  async function fetchAllStats() {
+    const grid = $('signalPerfGrid');
+    if (!grid) return;
 
-    if (serverStats && serverStats.total > 0) {
-      // Server-side data available — use it
-      kpiSignals.textContent = serverStats.total;
-      kpiWR.textContent = serverStats.win_rate + '%';
-      kpiTP.textContent = serverStats.tp;
-      kpiSL.textContent = serverStats.sl;
-      kpiPending.textContent = serverStats.pending;
-      kpiPnL.textContent = (serverStats.pnl_pips >= 0 ? '+' : '') + serverStats.pnl_pips.toFixed(0);
-
-      const wrEl = kpiWR.parentElement;
-      wrEl.className = 'stats-kpi ' + (serverStats.win_rate >= 50 ? 'kpi-wr-good' : 'kpi-wr-bad');
-      const pnlEl = kpiPnL.parentElement;
-      pnlEl.className = 'stats-kpi ' + (serverStats.pnl_pips >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg');
-
-      if (statsErrorBadge) statsErrorBadge.style.display = 'none';
-      return;
-    }
-
-    // Fallback: client-side SignalTracker
-    try {
-      const trackedStats = SignalTracker.getStats(sym);
-
-      kpiSignals.textContent = trackedStats.total;
-      kpiWR.textContent = trackedStats.win_rate + '%';
-      kpiTP.textContent = trackedStats.tp;
-      kpiSL.textContent = trackedStats.sl;
-      kpiPending.textContent = trackedStats.pending;
-
-      // Calculate PnL in pips based on tracked outcomes
-      let pnlPips = 0;
-      const pipSize = getPipSize(sym);
-      const history = SignalTracker.getHistory(sym, 500);
-      for (const sig of history) {
-        if (!sig.tracked || !sig.outcome || sig.outcome.includes('Pending')) continue;
-        const entry = sig.entry;
-        if (!entry || !pipSize) continue;
-        if (sig.outcome === 'hitTp1' && sig.tp1) {
-          pnlPips += (sig.direction === 'BUY' ? sig.tp1 - entry : entry - sig.tp1) / pipSize;
-        } else if (sig.outcome === 'hitTp2' && sig.tp2) {
-          pnlPips += (sig.direction === 'BUY' ? sig.tp2 - entry : entry - sig.tp2) / pipSize;
-        } else if (sig.outcome === 'SL' && sig.sl) {
-          pnlPips += (sig.direction === 'BUY' ? sig.sl - entry : entry - sig.sl) / pipSize;
+    const rows = [];
+    for (const sym of ALL_STATS_SYMBOLS) {
+      try {
+        const today = new Date();
+        const dates = [];
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          dates.push(d.toISOString().split('T')[0]);
         }
-      }
-      kpiPnL.textContent = (pnlPips >= 0 ? '+' : '') + Math.round(pnlPips).toFixed(0);
-
-      const wrEl = kpiWR.parentElement;
-      wrEl.className = 'stats-kpi ' + (trackedStats.win_rate >= 50 ? 'kpi-wr-good' : 'kpi-wr-bad');
-      const pnlEl = kpiPnL.parentElement;
-      pnlEl.className = 'stats-kpi ' + (pnlPips >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg');
-
-      if (statsErrorBadge) {
-        if (trackedStats.total === 0) {
-          statsErrorBadge.style.display = '';
-          statsErrorBadge.textContent = '⚠ Stats unavailable (no server data for today)';
-        } else {
-          statsErrorBadge.style.display = 'none';
+        const dailyResults = await Promise.all(dates.map(dt =>
+          fetch(`${BRIDGE_URL}/v6/public/stats/daily?symbol=${sym}&dt=${dt}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(json => json && json[sym] ? json[sym] : null)
+            .catch(() => null)
+        ));
+        let total = 0, completed = 0, pending = 0, tp = 0, sl = 0, pnl = 0;
+        for (const r of dailyResults) {
+          if (!r) continue;
+          total += r.total || 0; completed += r.completed || 0;
+          pending += r.pending || 0; tp += r.tp || 0; sl += r.sl || 0;
+          pnl += r.pnl_pips || 0;
         }
+        const wr = completed > 0 ? Math.round((tp / completed) * 1000) / 10 : 0;
+        pnl = Math.round(pnl * 100) / 100;
+        rows.push({ sym, total, tp, sl, pending, wr, pnl });
+      } catch (err) {
+        rows.push({ sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 });
       }
-    } catch (err) {
-      console.error('[fetchStats] Error:', err.message);
-      SignalTracker.errorLog('FETCH_STATS', `Failed to fetch stats for ${currentSymbol}`, err);
-      if (statsErrorBadge) {
-        statsErrorBadge.style.display = '';
-        statsErrorBadge.textContent = '⚠ Stats unavailable';
-      }
-      logError('Stats', err.message);
     }
+
+    grid.innerHTML = rows.map(r => {
+      const wrClass = r.wr >= 50 ? 'kpi-wr-good' : (r.total > 0 ? 'kpi-wr-bad' : '');
+      const pnlClass = r.pnl >= 0 ? 'kpi-pnl-pos' : 'kpi-pnl-neg';
+      const pnlText = r.total > 0 ? ((r.pnl >= 0 ? '+' : '') + r.pnl.toFixed(0)) : '--';
+      return `<div class="perf-sym-row">
+        <span class="perf-sym-label">${r.sym}</span>
+        <div class="stats-kpi"><span class="kpi-value">${r.total || '--'}</span><span class="kpi-label">Signals</span></div>
+        <div class="stats-kpi ${wrClass}"><span class="kpi-value">${r.total > 0 ? r.wr + '%' : '--'}</span><span class="kpi-label">Win Rate</span></div>
+        <div class="stats-kpi kpi-green"><span class="kpi-value">${r.total > 0 ? r.tp : '--'}</span><span class="kpi-label">TP</span></div>
+        <div class="stats-kpi kpi-red"><span class="kpi-value">${r.total > 0 ? r.sl : '--'}</span><span class="kpi-label">SL</span></div>
+        <div class="stats-kpi ${r.total > 0 ? pnlClass : ''}"><span class="kpi-value">${pnlText}</span><span class="kpi-label">P&L</span></div>
+        <div class="stats-kpi"><span class="kpi-value">${r.total > 0 ? r.pending : '--'}</span><span class="kpi-label">Pending</span></div>
+      </div>`;
+    }).join('');
+    if (statsErrorBadge) statsErrorBadge.style.display = 'none';
   }
 
-  // ── Fetch Trade Stats ──────────────────────────────────────────────
-  async function fetchTradeStats(gen) {
-    try {
-      const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v6/public/trades/daily-stats?symbol=${sym}&days=30`);
-      if (gen !== undefined && gen !== switchId) return;
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      if (gen !== undefined && gen !== switchId) return;
-      const ts = data[sym];
-      if (ts && ts.positions > 0) {
-        kpiPositions.textContent = ts.positions;
-        kpiTradeWR.textContent = ts.win_rate + '%';
-        kpiTradeWins.textContent = ts.wins;
-        kpiTradeLosses.textContent = ts.losses;
-        kpiTradePnL.textContent = (ts.net_pnl >= 0 ? '+$' : '-$') + Math.abs(ts.net_pnl).toFixed(2);
-        if (kpiAvgSlots && ts.avg_slots != null) kpiAvgSlots.textContent = 'avg ' + ts.avg_slots + ' slots';
-        const wrEl = kpiTradeWR.parentElement;
-        wrEl.className = 'stats-kpi ' + (ts.win_rate >= 50 ? 'kpi-trade-wr-good' : 'kpi-trade-wr-bad');
-        const pnlEl = kpiTradePnL.parentElement;
-        pnlEl.className = 'stats-kpi ' + (ts.net_pnl >= 0 ? 'kpi-trade-pnl-pos' : 'kpi-trade-pnl-neg');
-      } else {
-        resetTradeKPIs();
+  async function fetchAllTradeStats() {
+    const grid = $('tradePerfGrid');
+    if (!grid) return;
+
+    const rows = [];
+    for (const sym of ALL_STATS_SYMBOLS) {
+      try {
+        const [tsResp, sumResp] = await Promise.all([
+          fetch(`${BRIDGE_URL}/v6/public/trades/daily-stats?symbol=${sym}&days=30`).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`${BRIDGE_URL}/v6/public/trades/${sym}/summary?days=30`).then(r => r.ok ? r.json() : null).catch(() => null),
+        ]);
+        const ts = tsResp && tsResp[sym] ? tsResp[sym] : null;
+        const stats = sumResp && sumResp.stats ? sumResp.stats : {};
+        const pf = stats.profit_factor ?? stats.pf;
+        rows.push({
+          sym,
+          positions: ts ? ts.positions : 0,
+          wr: ts ? ts.win_rate : 0,
+          wins: ts ? ts.wins : 0,
+          losses: ts ? ts.losses : 0,
+          pnl: ts ? ts.net_pnl : 0,
+          pf: pf,
+        });
+      } catch (err) {
+        rows.push({ sym, positions: 0, wr: 0, wins: 0, losses: 0, pnl: 0, pf: null });
       }
-    } catch (err) {
-      console.warn('Trade stats fetch error:', err.message);
     }
-  }
 
-  // ── Fetch Trade Summary (PF + close reasons) ───────────────────────
-  async function fetchTradeSummary(gen) {
-    try {
-      const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v6/public/trades/${sym}/summary?days=30`);
-      if (gen !== undefined && gen !== switchId) return;
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      if (gen !== undefined && gen !== switchId) return;
-      const stats = data.stats || {};
-      const pf = stats.profit_factor ?? stats.pf;
-      if (kpiTradePF) kpiTradePF.textContent = pf != null ? pf.toFixed(2) : '--';
-    } catch (err) {
-      if (kpiTradePF) kpiTradePF.textContent = '--';
-    }
-  }
-
-  // ── Fetch EA Journal Stats (v5.36+) ────────────────────────────────
-  async function fetchJournalStats(gen) {
-    try {
-      const sym = currentSymbol;
-      const resp = await fetch(`${BRIDGE_URL}/v6/public/journal/stats?symbol=${sym}&days=30`);
-      if (gen !== undefined && gen !== switchId) return;
-      if (!resp.ok) return; // endpoint may not exist on older bridge — skip silently
-      const data = await resp.json();
-      if (gen !== undefined && gen !== switchId) return;
-      const ev = data.events;
-      if (!ev) {
-        if (kpiJournalOpens) kpiJournalOpens.textContent = '--';
-        if (kpiJournalSkips) kpiJournalSkips.textContent = '--';
-        if (kpiJournalTimeouts) kpiJournalTimeouts.textContent = '--';
-        if (kpiJournalBE) kpiJournalBE.textContent = '--';
-        if (kpiJournalCB) kpiJournalCB.textContent = '--';
-        if (kpiJournalGate) kpiJournalGate.textContent = '--';
-        return;
-      }
-      const total = Object.values(ev).reduce((a, b) => a + b, 0);
-      if (total === 0 && !ev.group_open) {
-        if (kpiJournalOpens) kpiJournalOpens.textContent = '--';
-        if (kpiJournalSkips) kpiJournalSkips.textContent = '--';
-        if (kpiJournalTimeouts) kpiJournalTimeouts.textContent = '--';
-        if (kpiJournalBE) kpiJournalBE.textContent = '--';
-        if (kpiJournalCB) kpiJournalCB.textContent = '--';
-        if (kpiJournalGate) kpiJournalGate.textContent = '--';
-        return;
-      }
-      if (journalActivityRow) journalActivityRow.style.display = '';
-      if (kpiJournalOpens)    kpiJournalOpens.textContent    = ev.group_open      ?? '--';
-      if (kpiJournalSkips)    kpiJournalSkips.textContent    = ev.entry_skip      ?? '--';
-      if (kpiJournalTimeouts) kpiJournalTimeouts.textContent = ev.order_timeout   ?? '--';
-      if (kpiJournalBE)       kpiJournalBE.textContent       = ev.be_triggered    ?? '--';
-      if (kpiJournalCB)       kpiJournalCB.textContent       = ev.circuit_breaker ?? '--';
-      if (kpiJournalGate)     kpiJournalGate.textContent     = ev.loss_gate       ?? '--';
-    } catch (err) {
-      // Journal stats not critical — skip silently (EA < v5.36 won't have data)
-    }
-  }
-
-  // ── 7-Day Sparkline ─────────────────────────────────────────────────
-  async function fetchSparklineData(sym) {
-    if (sparklineCache[sym]) return sparklineCache[sym];
-    const data = [];
-    const now = new Date();
-    const fetches = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const dt = d.toISOString().split('T')[0];
-      fetches.push(
-        fetch(`${BRIDGE_URL}/v6/public/stats/daily?symbol=${sym}&dt=${dt}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(json => json && json[sym] ? json[sym].pnl_pips || 0 : 0)
-          .catch(() => 0)
-      );
-    }
-    const results = await Promise.all(fetches);
-    sparklineCache[sym] = results;
-    return results;
-  }
-
-  function renderSparkline(data) {
-    const svg = $('pnlSparkline');
-    const wrap = $('sparklineWrap');
-    if (!svg || !wrap) return;
-
-    // Hide if all zeros
-    if (!data || data.every(v => v === 0)) { wrap.style.display = 'none'; return; }
-    wrap.style.display = '';
-
-    const W = 100, H = 36, pad = 4;
-    const cumulativePnL = [];
-    let running = 0;
-    for (const v of data) { running += v; cumulativePnL.push(running); }
-
-    const minV = Math.min(...cumulativePnL);
-    const maxV = Math.max(...cumulativePnL);
-    const range = maxV - minV || 1;
-    const n = cumulativePnL.length;
-
-    const pts = cumulativePnL.map((v, i) => {
-      const x = pad + (i / (n - 1)) * (W - 2 * pad);
-      const y = (H - pad) - ((v - minV) / range) * (H - 2 * pad);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-
-    const lastVal = cumulativePnL[cumulativePnL.length - 1];
-    const color = lastVal >= 0 ? '#22c55e' : '#ef4444';
-    const [lx, ly] = pts[pts.length - 1].split(',');
-    // Zero line
-    const zeroY = (H - pad) - ((0 - minV) / range) * (H - 2 * pad);
-    const zeroLine = minV < 0 && maxV > 0
-      ? `<line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${W - pad}" y2="${zeroY.toFixed(1)}" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="2,2"/>`
-      : '';
-    svg.innerHTML = `
-      ${zeroLine}
-      <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-      <circle cx="${lx}" cy="${ly}" r="2.5" fill="${color}"/>
-    `;
+    grid.innerHTML = rows.map(r => {
+      const wrClass = r.positions > 0 ? (r.wr >= 50 ? 'kpi-trade-wr-good' : 'kpi-trade-wr-bad') : '';
+      const pnlClass = r.positions > 0 ? (r.pnl >= 0 ? 'kpi-trade-pnl-pos' : 'kpi-trade-pnl-neg') : '';
+      const pnlText = r.positions > 0 ? ((r.pnl >= 0 ? '+$' : '-$') + Math.abs(r.pnl).toFixed(2)) : '--';
+      return `<div class="perf-sym-row">
+        <span class="perf-sym-label">${r.sym}</span>
+        <div class="stats-kpi"><span class="kpi-value">${r.positions || '--'}</span><span class="kpi-label">Positions</span></div>
+        <div class="stats-kpi ${wrClass}"><span class="kpi-value">${r.positions > 0 ? r.wr + '%' : '--'}</span><span class="kpi-label">Win Rate</span></div>
+        <div class="stats-kpi kpi-green"><span class="kpi-value">${r.positions > 0 ? r.wins : '--'}</span><span class="kpi-label">Wins</span></div>
+        <div class="stats-kpi kpi-red"><span class="kpi-value">${r.positions > 0 ? r.losses : '--'}</span><span class="kpi-label">Losses</span></div>
+        <div class="stats-kpi ${pnlClass}"><span class="kpi-value">${pnlText}</span><span class="kpi-label">P&L $</span></div>
+        <div class="stats-kpi"><span class="kpi-value">${r.pf != null ? r.pf.toFixed(2) : '--'}</span><span class="kpi-label">Prof. Factor</span></div>
+      </div>`;
+    }).join('');
   }
 
   // ── Update Signal Panel ─────────────────────────────────────────────

@@ -218,6 +218,26 @@ a:hover { color: #818cf8; }
 .kpi-trade-pnl-pos .kpi-value  { color: var(--buy); }
 .kpi-trade-pnl-neg .kpi-value  { color: var(--sell); }
 
+/* Multi-symbol perf rows */
+.perf-sym-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 6px 0;
+}
+.perf-sym-row + .perf-sym-row {
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.perf-sym-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  min-width: 62px;
+  letter-spacing: 0.5px;
+}
+
 /* EA Activity / Journal row */
 .stats-row-journal {
   margin-top: 6px;

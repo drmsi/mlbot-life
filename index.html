@@ -83,104 +83,26 @@
   <section class="stats-banner">
     <div class="container stats-boxes">
 
-      <!-- Signal Performance box -->
+      <!-- Signal Performance box — all symbols -->
       <div class="stats-box stats-box-signals">
         <div class="stats-box-header">
           <span class="stats-box-title">Signal Performance</span>
-          <span class="stats-box-period">this week</span>
+          <span class="stats-box-period">30 days</span>
         </div>
-        <div class="stats-row" id="statsRow">
-          <div class="stats-kpi">
-            <span class="kpi-value" id="kpiSignals">--</span>
-            <span class="kpi-label">Signals</span>
-          </div>
-          <div class="stats-kpi">
-            <span class="kpi-value" id="kpiWR">--</span>
-            <span class="kpi-label">Win Rate</span>
-          </div>
-          <div class="stats-kpi kpi-green">
-            <span class="kpi-value" id="kpiTP">--</span>
-            <span class="kpi-label">TP Hits</span>
-          </div>
-          <div class="stats-kpi kpi-red">
-            <span class="kpi-value" id="kpiSL">--</span>
-            <span class="kpi-label">SL Hits</span>
-          </div>
-          <div class="stats-kpi">
-            <span class="kpi-value" id="kpiPnL">--</span>
-            <span class="kpi-label">P&amp;L (pips)</span>
-          </div>
-          <div class="stats-kpi">
-            <span class="kpi-value" id="kpiPending">--</span>
-            <span class="kpi-label">Pending</span>
-          </div>
-          <div class="stats-sparkline-wrap" id="sparklineWrap" style="display:none">
-            <svg id="pnlSparkline" width="100" height="36" viewBox="0 0 100 36"></svg>
-            <span class="sparkline-label">7-day P&amp;L</span>
-          </div>
+        <div id="signalPerfGrid">
+          <!-- populated by JS: one row per symbol -->
         </div>
         <div id="statsErrorBadge" class="stats-error-badge" style="display:none"></div>
       </div>
 
-      <!-- Trade Execution box -->
+      <!-- Trade Execution box — all symbols -->
       <div class="stats-box stats-box-trades" id="tradeStatsRow">
         <div class="stats-box-header">
           <span class="stats-box-title">Trade Execution</span>
           <span class="stats-box-period">30 days</span>
         </div>
-        <div class="stats-row">
-          <div class="stats-kpi">
-            <span class="kpi-value" id="kpiPositions">--</span>
-            <span class="kpi-label">Positions</span>
-            <span class="kpi-sublabel" id="kpiAvgSlotsInline"></span>
-          </div>
-          <div class="stats-kpi">
-            <span class="kpi-value" id="kpiTradeWR">--</span>
-            <span class="kpi-label">Win Rate</span>
-          </div>
-          <div class="stats-kpi kpi-green">
-            <span class="kpi-value" id="kpiTradeWins">--</span>
-            <span class="kpi-label">Wins</span>
-          </div>
-          <div class="stats-kpi kpi-red">
-            <span class="kpi-value" id="kpiTradeLosses">--</span>
-            <span class="kpi-label">Losses</span>
-          </div>
-          <div class="stats-kpi">
-            <span class="kpi-value" id="kpiTradePnL">--</span>
-            <span class="kpi-label">P&amp;L $</span>
-          </div>
-          <div class="stats-kpi">
-            <span class="kpi-value" id="kpiTradePF">--</span>
-            <span class="kpi-label">Prof. Factor</span>
-          </div>
-        </div>
-        <!-- EA Activity row (v5.36+ journal events) -->
-        <div class="stats-row stats-row-journal" id="journalActivityRow" style="display:none">
-          <div class="stats-kpi stats-kpi-sm">
-            <span class="kpi-value kpi-value-sm" id="kpiJournalOpens">--</span>
-            <span class="kpi-label">Opens</span>
-          </div>
-          <div class="stats-kpi stats-kpi-sm">
-            <span class="kpi-value kpi-value-sm" id="kpiJournalSkips">--</span>
-            <span class="kpi-label">Skips</span>
-          </div>
-          <div class="stats-kpi stats-kpi-sm">
-            <span class="kpi-value kpi-value-sm" id="kpiJournalTimeouts">--</span>
-            <span class="kpi-label">Timeouts</span>
-          </div>
-          <div class="stats-kpi stats-kpi-sm">
-            <span class="kpi-value kpi-value-sm" id="kpiJournalBE">--</span>
-            <span class="kpi-label">BE Triggers</span>
-          </div>
-          <div class="stats-kpi stats-kpi-sm">
-            <span class="kpi-value kpi-value-sm" id="kpiJournalCB">--</span>
-            <span class="kpi-label">Circuit Brk</span>
-          </div>
-          <div class="stats-kpi stats-kpi-sm">
-            <span class="kpi-value kpi-value-sm" id="kpiJournalGate">--</span>
-            <span class="kpi-label">Loss Gates</span>
-          </div>
+        <div id="tradePerfGrid">
+          <!-- populated by JS: one row per symbol -->
         </div>
       </div>
 
@@ -365,6 +287,6 @@
   <div id="signalTooltip" class="signal-tooltip"></div>
 
   <script src="js/chart.js"></script>
-  <script src="js/app.js?v=6"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 </html>
