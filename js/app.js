@@ -431,6 +431,10 @@
   const signalReasonWrap = $('signalReasonWrap');
   const signalReason     = $('signalReason');
   const detailAlloc      = $('detailAlloc');
+  const detailMaxPos     = $('detailMaxPos');
+  const detailMinDist    = $('detailMinDist');
+  const detailExitMode   = $('detailExitMode');
+  const detailExitHold   = $('detailExitHold');
   const statsErrorBadge  = $('statsErrorBadge');
 
   // ── Init ────────────────────────────────────────────────────────────
@@ -896,6 +900,27 @@
         ? sig.capital_allocation_pct.toFixed(0) + '%'
         : '--';
     }
+    const sh = sig.shihda || {};
+    if (detailMaxPos) detailMaxPos.textContent = sig.max_open_positions != null ? sig.max_open_positions : '--';
+    if (detailMinDist) detailMinDist.textContent = sh.min_distance_atr != null ? sh.min_distance_atr + ' ATR' : '--';
+    if (detailExitMode) detailExitMode.textContent = sh.exit_mode || '--';
+    if (detailExitHold) detailExitHold.textContent = sh.exit_on_hold != null ? (sh.exit_on_hold ? 'Yes' : 'No') : '--';
+
+    // F5 structural level predictor
+    const f5Src = document.getElementById('detailF5Source');
+    const f5Trail = document.getElementById('detailTrailATR');
+    const f5Secure = document.getElementById('detailSecureProfit');
+    if (f5Src) {
+      const src = sig.f5_source || 'atr_fallback';
+      f5Src.textContent = src === 'f5' ? 'F5 Structural' : 'ATR Default';
+      f5Src.style.color = src === 'f5' ? '#00e5ff' : '#888';
+    }
+    if (f5Trail) {
+      f5Trail.textContent = sig.f5_trail_atr != null ? sig.f5_trail_atr + ' ATR' : '--';
+    }
+    if (f5Secure) {
+      f5Secure.textContent = sig.f5_secure_profit != null ? sig.f5_secure_profit + ' ATR' : '--';
+    }
 
     // Last bar
     if (sig.last_bar) {
@@ -925,6 +950,10 @@
     detailH1.textContent = '--';
     detailRisk.textContent = '--';
     if (detailAlloc) detailAlloc.textContent = '--';
+    if (detailMaxPos) detailMaxPos.textContent = '--';
+    if (detailMinDist) detailMinDist.textContent = '--';
+    if (detailExitMode) detailExitMode.textContent = '--';
+    if (detailExitHold) detailExitHold.textContent = '--';
     if (signalReasonWrap) signalReasonWrap.style.display = 'none';
     ChartManager.clearSignalLines();
   }
@@ -964,6 +993,7 @@
       strength: sig.strength_label || '--',
       outcome:  outcome,
       outcomeClass: outcomeClass,
+      f5Source: sig.f5_source || '',
     });
 
     if (signalHistory.length > MAX_HISTORY) signalHistory = signalHistory.slice(0, MAX_HISTORY);
@@ -972,7 +1002,7 @@
 
   function renderHistory() {
     if (signalHistory.length === 0) {
-      historyBody.innerHTML = '<tr class="empty-row"><td colspan="9">Waiting for signals...</td></tr>';
+      historyBody.innerHTML = '<tr class="empty-row"><td colspan="10">Waiting for signals...</td></tr>';
       return;
     }
     historyBody.innerHTML = signalHistory.map(h => `
@@ -986,6 +1016,7 @@
         <td>${h.tp2}</td>
         <td><span class="sig-badge ${h.outcomeClass}">${h.outcome === 'hitTp1' ? 'tp1' : h.outcome === 'hitTp2' ? 'tp2' : h.outcome}</span></td>
         <td>${h.strength}</td>
+        <td><span style="color:${h.f5Source === 'f5' ? '#00e5ff' : '#666'}">${h.f5Source === 'f5' ? 'F5' : 'ATR'}</span></td>
       </tr>
     `).join('');
   }
