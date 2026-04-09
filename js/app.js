@@ -729,7 +729,8 @@
     return `<div class="sym-kpi-row">
       <div class="sym-kpi"><span class="sym-kpi-value">${r.total || '--'}</span><span class="sym-kpi-label">Signals</span></div>
       <div class="sym-kpi ${wrClass}"><span class="sym-kpi-value">${r.total > 0 ? r.wr + '%' : '--'}</span><span class="sym-kpi-label">Win Rate</span></div>
-      <div class="sym-kpi kpi-green"><span class="sym-kpi-value">${r.total > 0 ? r.tp : '--'}</span><span class="sym-kpi-label">TP</span></div>
+      <div class="sym-kpi kpi-green"><span class="sym-kpi-value">${r.total > 0 ? r.tp1 : '--'}</span><span class="sym-kpi-label">TP1</span></div>
+      <div class="sym-kpi kpi-green"><span class="sym-kpi-value">${r.total > 0 ? r.tp2 : '--'}</span><span class="sym-kpi-label">TP2</span></div>
       <div class="sym-kpi kpi-red"><span class="sym-kpi-value">${r.total > 0 ? r.sl : '--'}</span><span class="sym-kpi-label">SL</span></div>
       <div class="sym-kpi ${r.total > 0 ? pnlClass : ''}"><span class="sym-kpi-value">${pnlText}</span><span class="sym-kpi-label">P&L</span></div>
       <div class="sym-kpi"><span class="sym-kpi-value">${r.total > 0 ? r.pending : '--'}</span><span class="sym-kpi-label">Pending</span></div>
@@ -791,18 +792,19 @@
             .then(json => json && json[sym] ? json[sym] : null)
             .catch(() => null)
         ));
-        let total = 0, completed = 0, pending = 0, tp = 0, sl = 0, pnl = 0;
+        let total = 0, completed = 0, pending = 0, tp = 0, tp1 = 0, tp2 = 0, sl = 0, pnl = 0;
         for (const r of dailyResults) {
           if (!r) continue;
           total += r.total || 0; completed += r.completed || 0;
           pending += r.pending || 0; tp += r.tp || 0; sl += r.sl || 0;
+          tp1 += r.tp1 || 0; tp2 += r.tp2 || 0;
           pnl += r.pnl_pips || 0;
         }
         const wr = completed > 0 ? Math.round((tp / completed) * 1000) / 10 : 0;
         pnl = Math.round(pnl * 100) / 100;
-        _sigData[sym] = { sym, total, tp, sl, pending, wr, pnl };
+        _sigData[sym] = { sym, total, tp, tp1, tp2, sl, pending, wr, pnl };
       } catch (err) {
-        _sigData[sym] = { sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
+        _sigData[sym] = { sym, total: 0, tp: 0, tp1: 0, tp2: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
       }
     }
     _renderDashGrid();
