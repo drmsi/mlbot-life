@@ -903,17 +903,37 @@
 
     // ── F6 detail panel ─────────────────────────────────────────────
     const fmtPct  = v => (v == null ? '--' : (v * 100).toFixed(1) + '%');
-    const fmtAtr  = v => (v == null ? '--' : (+v).toFixed(2) + ' ATR');
     const fmtBool = v => (v == null ? '--' : (v ? 'Pass' : 'Block'));
+
+    // USD conversion helpers
+    const _lot = sig.lot || 0.01;
+    const _ppl = sig.pnl_per_lot || 100;
+    const _price = sig.price || 0;
+    const priceUsd = (level) => {
+      if (level == null || level === 0 || _price === 0) return null;
+      return Math.abs(_price - level) * _lot * _ppl;
+    };
+    const fmtUsd = v => (v == null ? '--' : '$' + v.toFixed(2));
+    const secureUsd = (sig.secure_profit_usd_per_lot || 0) * _lot;
+    const trailStepUsd = (sig.trail_step_per_lot || 0) * _lot;
+
+    // Gate-based score: 50% = at gate, 100% = 2× gate (same as Telegram Signal Score)
+    const _confThresh = sig.confidence_threshold;
+    const gateScore = (v) => {
+      if (v == null || _confThresh == null || _confThresh <= 0) return '--';
+      const s = Math.min(100, Math.round((v / (2 * _confThresh)) * 100));
+      const w = s >= 90 ? '🔥' : s >= 70 ? '💪' : s >= 55 ? '👍' : s >= 50 ? '✅' : s >= 40 ? '⏳' : '⬜';
+      return `${w} ${s}%`;
+    };
 
     if (detailModule)     detailModule.textContent     = (sig.module || sig.model_used || '--').toString().toUpperCase();
     if (detailATR)        detailATR.textContent        = sig.atr != null ? sig.atr : '--';
     if (detailRegime)     detailRegime.textContent     = sig.regime_label || sig.regime || '--';
-    if (detailConfidence) detailConfidence.textContent = fmtPct(sig.confidence != null ? sig.confidence : sig.meta_confidence);
-    if (detailConfF2)     detailConfF2.textContent     = fmtPct(sig.confidence_f2);
-    if (detailConfF3)     detailConfF3.textContent     = fmtPct(sig.confidence_f3);
-    if (detailConfF5)     detailConfF5.textContent     = fmtPct(sig.confidence_f5);
-    if (detailConfChronos)detailConfChronos.textContent= fmtPct(sig.confidence_chronos);
+    if (detailConfidence) detailConfidence.textContent = gateScore(sig.confidence != null ? sig.confidence : sig.meta_confidence);
+    if (detailConfF2)     detailConfF2.textContent     = gateScore(sig.confidence_f2);
+    if (detailConfF3)     detailConfF3.textContent     = gateScore(sig.confidence_f3);
+    if (detailConfF5)     detailConfF5.textContent     = gateScore(sig.confidence_f5);
+    if (detailConfChronos)detailConfChronos.textContent= gateScore(sig.confidence_chronos);
     if (detailMMI)        detailMMI.textContent        = sig.mmi_score != null ? (+sig.mmi_score).toFixed(3) : '--';
     if (detailMMIValid) {
       detailMMIValid.textContent = fmtBool(sig.mmi_valid);
@@ -932,12 +952,12 @@
       detailF5Source.textContent = src === 'f6_native' ? 'F6 Native' : (src === 'f5' ? 'F5 Structural' : 'ATR Default');
       detailF5Source.style.color = src === 'f6_native' ? '#00e5ff' : (src === 'f5' ? '#00e5ff' : '#888');
     }
-    if (detailSLATR)        detailSLATR.textContent        = fmtAtr(sig.f5_sl_atr);
-    if (detailTP1ATR)       detailTP1ATR.textContent       = fmtAtr(sig.f5_tp1_atr);
-    if (detailTP2ATR)       detailTP2ATR.textContent       = fmtAtr(sig.f5_tp2_atr);
-    if (detailTrailATR)     detailTrailATR.textContent     = fmtAtr(sig.f5_trail_atr);
-    if (detailTrailStep)    detailTrailStep.textContent    = fmtAtr(sig.f5_trail_step);
-    if (detailSecureProfit) detailSecureProfit.textContent = fmtAtr(sig.f5_secure_profit);
+    if (detailSLATR)        detailSLATR.textContent        = fmtUsd(priceUsd(sig.sl));
+    if (detailTP1ATR)       detailTP1ATR.textContent       = fmtUsd(priceUsd(sig.tp1));
+    if (detailTP2ATR)       detailTP2ATR.textContent       = fmtUsd(priceUsd(sig.tp2));
+    if (detailTrailATR)     detailTrailATR.textContent     = trailStepUsd > 0 ? fmtUsd(trailStepUsd) + '/step' : '--';
+    if (detailTrailStep)    detailTrailStep.textContent    = trailStepUsd > 0 ? fmtUsd(trailStepUsd) : '--';
+    if (detailSecureProfit) detailSecureProfit.textContent = secureUsd > 0 ? fmtUsd(secureUsd) : '--';
 
     // Last bar
     if (sig.last_bar) {
