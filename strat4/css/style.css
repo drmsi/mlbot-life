@@ -137,6 +137,20 @@ a:hover { color: #818cf8; }
   padding: 12px;
   min-width: 0;
   overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.sym-dash-col:hover {
+  border-color: #6366f1;
+}
+.sym-dash-col.active {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.3);
+}
+.sym-dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
 }
 .sym-dash-title {
   font-size: 0.95rem;
@@ -144,8 +158,24 @@ a:hover { color: #818cf8; }
   font-family: var(--font-mono);
   color: var(--text-primary);
   letter-spacing: 1px;
+}
+.sym-dash-live {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 10px;
-  text-align: center;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.sym-dash-price {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+.sym-dash-score {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 .sym-dash-section {
   margin-bottom: 8px;

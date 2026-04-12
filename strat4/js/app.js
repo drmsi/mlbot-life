@@ -458,7 +458,7 @@
       window.history.replaceState({}, '', url.toString());
     }
     ChartManager.init('chartContainer');
-    renderOverviewGrid(); // show empty grid immediately
+    _renderDashGrid(); // show empty grid immediately
     // Fetch all-symbols stats (independent of selected symbol)
     fetchAllStats();
     fetchAllTradeStats();
@@ -538,9 +538,9 @@
       if (gen !== undefined && gen !== switchId) return;  // stale
       setConnected(true);
 
-      // Cache all symbols data + update overview grid
+      // Cache all symbols data + update dashboard grid
       allSignalsCache = data;
-      renderOverviewGrid();
+      _renderDashGrid();
 
       const sig = data[currentSymbol];
       if (!sig) {
@@ -569,32 +569,7 @@
   }
 
   // ── Overview Grid ────────────────────────────────────────────────────
-  function renderOverviewGrid() {
-    const grid = $('overviewGrid');
-    if (!grid) return;
-    const symbols = ['XAUUSD', 'BTCUSD', 'ETHUSD', 'EURUSD', 'GBPUSD', 'XAGUSD', 'BRENTCMDUSD', 'USDJPY'];
-    const names   = {XAUUSD:'Gold', BTCUSD:'BTC', ETHUSD:'ETH', EURUSD:'EUR', GBPUSD:'GBP', XAGUSD:'Silver', BRENTCMDUSD:'Brent', USDJPY:'JPY'};
-    grid.innerHTML = symbols.map(sym => {
-      const sig = allSignalsCache[sym];
-      const dir = sig ? (sig.signal || 'HOLD') : '?';
-      const dec = getDecimals(sym);
-      const price = sig && sig.price != null ? sig.price.toFixed(dec) : '--';
-      // F6: show meta confidence in the overview tile (no capital_allocation in F6)
-      const confVal = sig && (sig.confidence != null ? sig.confidence : sig.meta_confidence);
-      const alloc = confVal != null ? (confVal * 100).toFixed(0) + '%' : '--';
-      const isActive = sym === currentSymbol;
-      return `<div class="ov-card${isActive ? ' active' : ''}" data-sym="${sym}" onclick="window._switchSym('${sym}')">
-        <div class="ov-sym">${sym === 'BRENTCMDUSD' ? 'BRENT' : sym}</div>
-        <div class="ov-row">
-          <span class="ov-badge ${dir.toLowerCase()}">${dir}</span>
-          <span class="ov-alloc">${alloc}</span>
-        </div>
-        <div class="ov-price">${price}</div>
-      </div>`;
-    }).join('');
-  }
-
-  // Expose switchSymbol globally for overview grid onclick
+  // Expose switchSymbol globally for dashboard card onclick
   window._switchSym = function(sym) {
     switchSymbol(sym);
   };
@@ -771,20 +746,46 @@
   let _sigData = {};
   let _tradeData = {};
 
+  const SYM_NAMES = {XAUUSD:'Gold', BTCUSD:'BTC', ETHUSD:'ETH', EURUSD:'EUR', GBPUSD:'GBP', XAGUSD:'Silver', BRENTCMDUSD:'Brent', USDJPY:'JPY'};
+
   function _renderDashGrid() {
     const grid = $('symDashGrid');
     if (!grid) return;
     grid.innerHTML = ALL_STATS_SYMBOLS.map(sym => {
-      const sig = _sigData[sym] || { sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
+      const sigStats = _sigData[sym] || { sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
       const tr = _tradeData[sym] || { sym, positions: 0, wr: 0, wins: 0, losses: 0, pnl: 0, pf: null };
-      return `<div class="sym-dash-col">
-        <div class="sym-dash-title">${sym}</div>
+      const isActive = sym === currentSymbol;
+
+      // Live signal info from cache
+      const live = allSignalsCache[sym];
+      const dir = live ? (live.signal || 'HOLD') : '?';
+      const dec = getDecimals(sym);
+      const price = live && live.price != null ? live.price.toFixed(dec) : '--';
+      const confVal = live && (live.confidence != null ? live.confidence : live.meta_confidence);
+      const confThresh = live && live.confidence_threshold;
+      let scoreStr = '--';
+      if (confVal != null && confThresh != null && confThresh > 0) {
+        const s = Math.min(100, Math.round((confVal / (2 * confThresh)) * 100));
+        const w = s >= 90 ? '🔥' : s >= 70 ? '💪' : s >= 55 ? '👍' : s >= 50 ? '✅' : s >= 40 ? '⏳' : '⬜';
+        scoreStr = w + ' ' + s + '%';
+      }
+      const name = SYM_NAMES[sym] || sym;
+
+      return `<div class="sym-dash-col${isActive ? ' active' : ''}" onclick="window._switchSym('${sym}')" style="cursor:pointer">
+        <div class="sym-dash-header">
+          <span class="sym-dash-title">${sym === 'BRENTCMDUSD' ? 'BRENT' : sym} <span style="opacity:0.5;font-size:0.8em">${name}</span></span>
+          <span class="ov-badge ${dir.toLowerCase()}">${dir}</span>
+        </div>
+        <div class="sym-dash-live">
+          <span class="sym-dash-price">${price}</span>
+          <span class="sym-dash-score">${scoreStr}</span>
+        </div>
         <div class="sym-dash-section sym-dash-section-signals">
-          <div class="sym-dash-section-title">Signal Performance <span class="sym-dash-period">30d</span></div>
-          ${_signalKpiRow(sig)}
+          <div class="sym-dash-section-title">Signals <span class="sym-dash-period">30d</span></div>
+          ${_signalKpiRow(sigStats)}
         </div>
         <div class="sym-dash-section sym-dash-section-trades">
-          <div class="sym-dash-section-title">Trade Execution <span class="sym-dash-period">30d</span></div>
+          <div class="sym-dash-section-title">Trades <span class="sym-dash-period">30d</span></div>
           ${_tradeKpiRow(tr)}
         </div>
       </div>`;
