@@ -760,7 +760,27 @@
   function _renderDashGrid() {
     const grid = $('symDashGrid');
     if (!grid) return;
-    grid.innerHTML = ALL_STATS_SYMBOLS.map(sym => {
+
+    // Bubble bar for inactive symbols (compact pills at top)
+    const bubbles = dashExpandAll ? '' : ALL_STATS_SYMBOLS
+      .filter(sym => sym !== currentSymbol)
+      .map(sym => {
+        const live = allSignalsCache[sym];
+        const dir = live ? (live.signal || 'HOLD') : '?';
+        const dec = getDecimals(sym);
+        const price = live && live.price != null ? live.price.toFixed(dec) : '--';
+        const label = sym === 'BRENTCMDUSD' ? 'BRENT' : sym;
+        return `<div class="sym-bubble ${dir.toLowerCase()}" onclick="window._switchSym('${sym}')">
+          <span class="sym-bubble-name">${label}</span>
+          <span class="sym-bubble-badge">${dir}</span>
+          <span class="sym-bubble-price">${price}</span>
+        </div>`;
+      }).join('');
+
+    const bubbleBar = bubbles ? `<div class="sym-bubble-bar">${bubbles}</div>` : '';
+
+    // Expanded cards
+    const cards = ALL_STATS_SYMBOLS.filter(sym => dashExpandAll || sym === currentSymbol).map(sym => {
       const sigStats = _sigData[sym] || { sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
       const tr = _tradeData[sym] || { sym, positions: 0, wr: 0, wins: 0, losses: 0, pnl: 0, pf: null };
       const isActive = sym === currentSymbol;
@@ -780,18 +800,7 @@
       }
       const name = SYM_NAMES[sym] || sym;
 
-      const expanded = dashExpandAll || isActive;
-      const detailHtml = expanded ? `
-        <div class="sym-dash-section sym-dash-section-signals">
-          <div class="sym-dash-section-title">Signals <span class="sym-dash-period">30d</span></div>
-          ${_signalKpiRow(sigStats)}
-        </div>
-        <div class="sym-dash-section sym-dash-section-trades">
-          <div class="sym-dash-section-title">Trades <span class="sym-dash-period">30d</span></div>
-          ${_tradeKpiRow(tr)}
-        </div>` : '';
-
-      return `<div class="sym-dash-col${isActive ? ' active' : ''}${expanded ? '' : ' collapsed'}" onclick="window._switchSym('${sym}')" style="cursor:pointer">
+      return `<div class="sym-dash-col${isActive ? ' active' : ''}" onclick="window._switchSym('${sym}')" style="cursor:pointer">
         <div class="sym-dash-header">
           <span class="sym-dash-title">${sym === 'BRENTCMDUSD' ? 'BRENT' : sym} <span style="opacity:0.5;font-size:0.8em">${name}</span></span>
           <span class="ov-badge ${dir.toLowerCase()}">${dir}</span>
@@ -800,9 +809,18 @@
           <span class="sym-dash-price">${price}</span>
           <span class="sym-dash-score">${scoreStr}</span>
         </div>
-        ${detailHtml}
+        <div class="sym-dash-section sym-dash-section-signals">
+          <div class="sym-dash-section-title">Signals <span class="sym-dash-period">30d</span></div>
+          ${_signalKpiRow(sigStats)}
+        </div>
+        <div class="sym-dash-section sym-dash-section-trades">
+          <div class="sym-dash-section-title">Trades <span class="sym-dash-period">30d</span></div>
+          ${_tradeKpiRow(tr)}
+        </div>
       </div>`;
     }).join('');
+
+    grid.innerHTML = bubbleBar + cards;
   }
 
   async function fetchAllStats() {
