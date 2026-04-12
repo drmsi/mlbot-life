@@ -572,8 +572,8 @@
   function renderOverviewGrid() {
     const grid = $('overviewGrid');
     if (!grid) return;
-    const symbols = ['XAUUSD'];
-    const names   = {XAUUSD:'Gold'};
+    const symbols = ['XAUUSD', 'BTCUSD', 'ETHUSD', 'EURUSD', 'GBPUSD', 'XAGUSD', 'BRENTCMDUSD', 'USDJPY'];
+    const names   = {XAUUSD:'Gold', BTCUSD:'BTC', ETHUSD:'ETH', EURUSD:'EUR', GBPUSD:'GBP', XAGUSD:'Silver', BRENTCMDUSD:'Brent', USDJPY:'JPY'};
     grid.innerHTML = symbols.map(sym => {
       const sig = allSignalsCache[sym];
       const dir = sig ? (sig.signal || 'HOLD') : '?';
@@ -734,7 +734,7 @@
   }
 
   // ── All-symbols stats (signal performance + trade execution) ─────
-  const ALL_STATS_SYMBOLS = ['XAUUSD'];
+  const ALL_STATS_SYMBOLS = ['XAUUSD', 'BTCUSD', 'ETHUSD', 'EURUSD', 'GBPUSD', 'XAGUSD', 'BRENTCMDUSD', 'USDJPY'];
 
   // Render signal KPI row HTML for one symbol
   function _signalKpiRow(r) {
@@ -1042,7 +1042,7 @@
         <td>${h.tp2}</td>
         <td><span class="sig-badge ${h.outcomeClass}">${h.outcome === 'hitTp1' ? 'tp1' : h.outcome === 'hitTp2' ? 'tp2' : h.outcome}</span></td>
         <td>${h.strength}</td>
-        <td><span style="color:${h.f5Source === 'f5' ? '#00e5ff' : '#666'}">${h.f5Source === 'f5' ? 'F5' : 'ATR'}</span></td>
+        <td><span style="color:${h.f5Source === 'f6_native' ? '#00e5ff' : h.f5Source === 'f5' ? '#00e5ff' : '#666'}">${h.f5Source === 'f6_native' ? 'F6' : h.f5Source === 'f5' ? 'F5' : 'ATR'}</span></td>
       </tr>
     `).join('');
   }
