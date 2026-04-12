@@ -437,9 +437,8 @@
   const detailSLATR        = $('detailSLATR');
   const detailTP1ATR       = $('detailTP1ATR');
   const detailTP2ATR       = $('detailTP2ATR');
-  const detailTrailATR     = $('detailTrailATR');
-  const detailTrailStep    = $('detailTrailStep');
   const detailSecureProfit = $('detailSecureProfit');
+  const detailTrailATR     = $('detailTrailATR');
   const historyBody  = $('historyBody');
   // Stats grids are rendered dynamically — no individual KPI refs needed
   const signalReasonWrap = $('signalReasonWrap');
@@ -956,9 +955,8 @@
     if (detailSLATR)        detailSLATR.textContent        = fmtUsd(priceUsd(sig.sl));
     if (detailTP1ATR)       detailTP1ATR.textContent       = fmtUsd(priceUsd(sig.tp1));
     if (detailTP2ATR)       detailTP2ATR.textContent       = fmtUsd(priceUsd(sig.tp2));
-    if (detailTrailATR)     detailTrailATR.textContent     = trailStepUsd > 0 ? fmtUsd(trailStepUsd) + '/step' : '--';
-    if (detailTrailStep)    detailTrailStep.textContent    = trailStepUsd > 0 ? fmtUsd(trailStepUsd) : '--';
     if (detailSecureProfit) detailSecureProfit.textContent = secureUsd > 0 ? fmtUsd(secureUsd) : '--';
+    if (detailTrailATR)     detailTrailATR.textContent     = trailStepUsd > 0 ? fmtUsd(trailStepUsd) : '--';
 
     // Last bar
     if (sig.last_bar) {
@@ -998,9 +996,8 @@
     if (detailSLATR)        detailSLATR.textContent        = '--';
     if (detailTP1ATR)       detailTP1ATR.textContent       = '--';
     if (detailTP2ATR)       detailTP2ATR.textContent       = '--';
-    if (detailTrailATR)     detailTrailATR.textContent     = '--';
-    if (detailTrailStep)    detailTrailStep.textContent    = '--';
     if (detailSecureProfit) detailSecureProfit.textContent = '--';
+    if (detailTrailATR)     detailTrailATR.textContent     = '--';
     if (signalReasonWrap) signalReasonWrap.style.display = 'none';
     ChartManager.clearSignalLines();
   }
