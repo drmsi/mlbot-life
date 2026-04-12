@@ -761,16 +761,16 @@
     const grid = $('symDashGrid');
     if (!grid) return;
 
-    // Bubble bar for inactive symbols (compact pills at top)
+    // Bubble bar — all 8 symbols always shown, active one highlighted
     const bubbles = dashExpandAll ? '' : ALL_STATS_SYMBOLS
-      .filter(sym => sym !== currentSymbol)
       .map(sym => {
+        const isActive = sym === currentSymbol;
         const live = allSignalsCache[sym];
         const dir = live ? (live.signal || 'HOLD') : '?';
         const dec = getDecimals(sym);
         const price = live && live.price != null ? live.price.toFixed(dec) : '--';
         const label = sym === 'BRENTCMDUSD' ? 'BRENT' : sym;
-        return `<div class="sym-bubble ${dir.toLowerCase()}" onclick="window._switchSym('${sym}')">
+        return `<div class="sym-bubble ${dir.toLowerCase()}${isActive ? ' sym-bubble-active' : ''}" onclick="window._switchSym('${sym}')">
           <span class="sym-bubble-name">${label}</span>
           <span class="sym-bubble-badge">${dir}</span>
           <span class="sym-bubble-price">${price}</span>

@@ -169,6 +169,11 @@ a:hover { color: #818cf8; }
   border-color: #6366f1;
   background: rgba(99,102,241,0.08);
 }
+.sym-bubble.sym-bubble-active {
+  border-color: #818cf8;
+  background: rgba(99,102,241,0.15);
+  box-shadow: 0 0 0 1px rgba(99,102,241,0.3);
+}
 .sym-bubble-name {
   font-weight: 700;
   font-family: var(--font-mono);
