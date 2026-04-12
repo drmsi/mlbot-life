@@ -146,6 +146,33 @@ a:hover { color: #818cf8; }
   border-color: #818cf8;
   box-shadow: 0 0 0 2px rgba(99,102,241,0.3);
 }
+.sym-dash-col.collapsed {
+  padding: 8px 12px;
+}
+.sym-dash-col.collapsed .sym-dash-live {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.sym-dash-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+.sym-dash-toggle {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.sym-dash-toggle:hover {
+  border-color: #6366f1;
+  color: var(--text-primary);
+}
 .sym-dash-header {
   display: flex;
   justify-content: space-between;

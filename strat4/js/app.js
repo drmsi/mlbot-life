@@ -568,6 +568,16 @@
   }
 
   // ── Overview Grid ────────────────────────────────────────────────────
+  // Dashboard expand/collapse state: false = only active expanded (default)
+  let dashExpandAll = false;
+
+  window._toggleDashExpand = function() {
+    dashExpandAll = !dashExpandAll;
+    const btn = $('dashToggle');
+    if (btn) btn.textContent = dashExpandAll ? 'Active Only' : 'Expand All';
+    _renderDashGrid();
+  };
+
   // Expose switchSymbol globally for dashboard card onclick
   window._switchSym = function(sym) {
     switchSymbol(sym);
@@ -770,7 +780,18 @@
       }
       const name = SYM_NAMES[sym] || sym;
 
-      return `<div class="sym-dash-col${isActive ? ' active' : ''}" onclick="window._switchSym('${sym}')" style="cursor:pointer">
+      const expanded = dashExpandAll || isActive;
+      const detailHtml = expanded ? `
+        <div class="sym-dash-section sym-dash-section-signals">
+          <div class="sym-dash-section-title">Signals <span class="sym-dash-period">30d</span></div>
+          ${_signalKpiRow(sigStats)}
+        </div>
+        <div class="sym-dash-section sym-dash-section-trades">
+          <div class="sym-dash-section-title">Trades <span class="sym-dash-period">30d</span></div>
+          ${_tradeKpiRow(tr)}
+        </div>` : '';
+
+      return `<div class="sym-dash-col${isActive ? ' active' : ''}${expanded ? '' : ' collapsed'}" onclick="window._switchSym('${sym}')" style="cursor:pointer">
         <div class="sym-dash-header">
           <span class="sym-dash-title">${sym === 'BRENTCMDUSD' ? 'BRENT' : sym} <span style="opacity:0.5;font-size:0.8em">${name}</span></span>
           <span class="ov-badge ${dir.toLowerCase()}">${dir}</span>
@@ -779,14 +800,7 @@
           <span class="sym-dash-price">${price}</span>
           <span class="sym-dash-score">${scoreStr}</span>
         </div>
-        <div class="sym-dash-section sym-dash-section-signals">
-          <div class="sym-dash-section-title">Signals <span class="sym-dash-period">30d</span></div>
-          ${_signalKpiRow(sigStats)}
-        </div>
-        <div class="sym-dash-section sym-dash-section-trades">
-          <div class="sym-dash-section-title">Trades <span class="sym-dash-period">30d</span></div>
-          ${_tradeKpiRow(tr)}
-        </div>
+        ${detailHtml}
       </div>`;
     }).join('');
   }

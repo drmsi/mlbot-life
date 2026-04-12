@@ -73,8 +73,11 @@
   <!-- ═══ STATS DASHBOARD ═══ -->
   <section class="stats-banner">
     <div class="container">
+      <div class="sym-dash-toolbar">
+        <button class="sym-dash-toggle" id="dashToggle" onclick="window._toggleDashExpand()">Expand All</button>
+      </div>
       <div class="sym-dash-grid" id="symDashGrid">
-        <!-- populated by JS: two columns, one per symbol -->
+        <!-- populated by JS -->
       </div>
     </div>
   </section>
@@ -294,6 +297,6 @@
   <div id="signalTooltip" class="signal-tooltip"></div>
 
   <script src="js/chart.js?v=2-f6"></script>
-  <script src="js/app.js?v=11-f6"></script>
+  <script src="js/app.js?v=12-f6"></script>
 </body>
 </html>
