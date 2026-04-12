@@ -20,6 +20,7 @@ const ChartManager = (() => {
   let markers = [];
   let liveSignalTs = null;      // timestamp of current live signal (to deduplicate vs history)
   let liveSignalDir = null;     // direction of current live signal ('BUY'/'SELL')
+  let liveSignalData = null;    // full signal object for tooltip on click
   let historyMarkers = [];
   let historySignals = [];
   let tradeMarkers = [];
@@ -126,6 +127,51 @@ const ChartManager = (() => {
       if (tradeMatch && tradeDist <= bestDist) {
         _showTradeTooltip(tradeMatch, param, container, tooltip);
         return;
+      }
+
+      // Check live signal marker if no history/trade match
+      if (!match && liveSignalTs && liveSignalData) {
+        const liveDist = Math.abs(liveSignalTs - param.time);
+        if (liveDist <= SNAP_SEC) {
+          // Show live signal tooltip with F6 fields
+          const sig = liveSignalData;
+          const dec = PRICE_DECIMALS[currentSymbol] || 2;
+
+          const _conf = sig.confidence != null ? sig.confidence : sig.meta_confidence;
+          const _thresh = sig.confidence_threshold;
+          let _sNum = 0;
+          if (_conf != null && _thresh != null && _thresh > 0)
+            _sNum = Math.min(100, Math.round((_conf / (2 * _thresh)) * 100));
+          const _sWord = _sNum >= 90 ? '🔥 V.Strong' : _sNum >= 70 ? '💪 Strong'
+            : _sNum >= 55 ? '👍 Good' : _sNum >= 50 ? '✅ Pass'
+            : _sNum >= 40 ? '⏳ Building' : '⬜ Weak';
+
+          const _rm = sig.risk_multiplier != null ? sig.risk_multiplier : null;
+          const _rmStr = _rm != null ? (_rm >= 1.0 ? '🔥 Full' : _rm >= 0.7 ? '⚡ 70%' : '🔅 50%') : '--';
+          const _mmiStr = sig.mmi_score != null ? Number(sig.mmi_score).toFixed(3) + (sig.mmi_valid ? ' ✅' : ' ❌') : '--';
+
+          tooltip.innerHTML = `
+            <div class="tt-header">
+              <span class="sig-badge ${sig.signal.toLowerCase()}">${sig.signal}</span>
+              <span class="sig-badge hold">LIVE</span>
+            </div>
+            <div class="tt-row"><span>Entry</span><span>${sig.price != null ? sig.price.toFixed(dec) : '--'}</span></div>
+            <div class="tt-row"><span>SL</span><span>${sig.sl != null && sig.sl !== 0 ? sig.sl.toFixed(dec) : '--'}</span></div>
+            <div class="tt-row"><span>TP1</span><span>${sig.tp1 != null && sig.tp1 !== 0 ? sig.tp1.toFixed(dec) : '--'}</span></div>
+            <div class="tt-row"><span>TP2</span><span>${sig.tp2 != null && sig.tp2 !== 0 ? sig.tp2.toFixed(dec) : '--'}</span></div>
+            <div class="tt-row"><span>Signal Score</span><span>${_sWord} ${_sNum}%</span></div>
+            <div class="tt-row"><span>Risk</span><span>${_rmStr}</span></div>
+            <div class="tt-row"><span>MMI</span><span>${_mmiStr}</span></div>
+            <div class="tt-row"><span>Regime</span><span>${sig.regime_label || sig.regime || '--'}</span></div>
+            <div class="tt-row"><span>Lot</span><span>${sig.lot || '--'}</span></div>
+            <div class="tt-row"><span>ATR</span><span>${sig.atr != null ? sig.atr : '--'}</span></div>
+          `;
+          const chartRect = container.getBoundingClientRect();
+          tooltip.style.left = (chartRect.left + 8) + 'px';
+          tooltip.style.top = (chartRect.top + 8) + 'px';
+          tooltip.style.display = 'block';
+          return;
+        }
       }
 
       if (!match) {
@@ -311,6 +357,7 @@ const ChartManager = (() => {
     }
 
     hasActiveSignal = true;
+    liveSignalData = signal;
     _clearHistoryPriceLines();
 
     _drawPriceLines({ price: signal.price, sl: signal.sl, tp1: signal.tp1, tp2: signal.tp2 }, 'live');
@@ -547,6 +594,7 @@ const ChartManager = (() => {
     expandedTs = null;
     liveSignalTs = null;
     liveSignalDir = null;
+    liveSignalData = null;
     // Remove price lines from chart BEFORE nulling refs (prevents ghost lines on symbol switch)
     clearSignalLines();
     _clearHistoryPriceLines();
