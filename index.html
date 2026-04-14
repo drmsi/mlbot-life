@@ -73,16 +73,10 @@
   <!-- ═══ STATS DASHBOARD ═══ -->
   <section class="stats-banner">
     <div class="container">
-      <div class="sym-dash-grid" id="symDashGrid">
-        <!-- populated by JS: two columns, one per symbol -->
+      <div class="sym-dash-toolbar">
+        <button class="sym-dash-toggle" id="dashToggle" onclick="window._toggleDashExpand()">Expand All</button>
       </div>
-    </div>
-  </section>
-
-  <!-- ═══ OVERVIEW GRID (symbol buttons) ═══ -->
-  <section class="overview-section">
-    <div class="container">
-      <div class="overview-grid" id="overviewGrid">
+      <div class="sym-dash-grid" id="symDashGrid">
         <!-- populated by JS -->
       </div>
     </div>
@@ -148,40 +142,52 @@
           </div>
           <div class="signal-details">
             <div class="detail-row">
+              <span>Module</span><span id="detailModule">--</span>
+            </div>
+            <div class="detail-row">
               <span>ATR</span><span id="detailATR">--</span>
             </div>
             <div class="detail-row">
               <span>Regime</span><span id="detailRegime">--</span>
             </div>
             <div class="detail-row">
-              <span>H1 Gate</span><span id="detailH1">--</span>
+              <span>Confidence</span><span id="detailConfidence">--</span>
             </div>
             <div class="detail-row">
-              <span>Risk Mult.</span><span id="detailRisk">--</span>
+              <span>F2 Conf</span><span id="detailConfF2">--</span>
             </div>
             <div class="detail-row">
-              <span>Capital Alloc.</span><span id="detailAlloc">--</span>
+              <span>F3 Conf</span><span id="detailConfF3">--</span>
             </div>
             <div class="detail-row">
-              <span>Max Positions</span><span id="detailMaxPos">--</span>
+              <span>F5 Conf</span><span id="detailConfF5">--</span>
             </div>
             <div class="detail-row">
-              <span>Min Distance</span><span id="detailMinDist">--</span>
+              <span>Chronos Conf</span><span id="detailConfChronos">--</span>
             </div>
             <div class="detail-row">
-              <span>Exit Mode</span><span id="detailExitMode">--</span>
+              <span>MMI Score</span><span id="detailMMI">--</span>
             </div>
             <div class="detail-row">
-              <span>Exit on Hold</span><span id="detailExitHold">--</span>
+              <span>MMI Gate</span><span id="detailMMIValid">--</span>
+            </div>
+            <div class="detail-row">
+              <span>Micro Entry</span><span id="detailMicroEntry">--</span>
             </div>
             <div class="detail-row">
               <span>SL/TP Source</span><span id="detailF5Source">--</span>
             </div>
             <div class="detail-row">
-              <span>Trail ATR</span><span id="detailTrailATR">--</span>
+              <span>SL Risk $</span><span id="detailSLATR">--</span>
             </div>
             <div class="detail-row">
-              <span>Secure Profit</span><span id="detailSecureProfit">--</span>
+              <span>TP Reward $</span><span id="detailTP1ATR">--</span>
+            </div>
+            <div class="detail-row">
+              <span>Secure $</span><span id="detailSecureProfit">--</span>
+            </div>
+            <div class="detail-row">
+              <span>Trail Step $</span><span id="detailTrailATR">--</span>
             </div>
           </div>
         </div>
@@ -282,7 +288,7 @@
   <!-- Signal tooltip for history markers -->
   <div id="signalTooltip" class="signal-tooltip"></div>
 
-  <script src="js/chart.js"></script>
-  <script src="js/app.js?v=8"></script>
+  <script src="js/chart.js?v=4"></script>
+  <script src="js/app.js?v=15"></script>
 </body>
 </html>

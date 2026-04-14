@@ -20,6 +20,7 @@ const ChartManager = (() => {
   let markers = [];
   let liveSignalTs = null;      // timestamp of current live signal (to deduplicate vs history)
   let liveSignalDir = null;     // direction of current live signal ('BUY'/'SELL')
+  let liveSignalData = null;    // full signal object for tooltip on click
   let historyMarkers = [];
   let historySignals = [];
   let tradeMarkers = [];
@@ -128,6 +129,51 @@ const ChartManager = (() => {
         return;
       }
 
+      // Check live signal marker if no history/trade match
+      if (!match && liveSignalTs && liveSignalData) {
+        const liveDist = Math.abs(liveSignalTs - param.time);
+        if (liveDist <= SNAP_SEC) {
+          // Show live signal tooltip with F6 fields
+          const sig = liveSignalData;
+          const dec = PRICE_DECIMALS[currentSymbol] || 2;
+
+          const _conf = sig.confidence != null ? sig.confidence : sig.meta_confidence;
+          const _thresh = sig.confidence_threshold;
+          let _sNum = 0;
+          if (_conf != null && _thresh != null && _thresh > 0)
+            _sNum = Math.min(100, Math.round((_conf / (2 * _thresh)) * 100));
+          const _sWord = _sNum >= 90 ? '🔥 V.Strong' : _sNum >= 70 ? '💪 Strong'
+            : _sNum >= 55 ? '👍 Good' : _sNum >= 50 ? '✅ Pass'
+            : _sNum >= 40 ? '⏳ Building' : '⬜ Weak';
+
+          const _rm = sig.risk_multiplier != null ? sig.risk_multiplier : null;
+          const _rmStr = _rm != null ? (_rm >= 1.0 ? '🔥 Full' : _rm >= 0.7 ? '⚡ 70%' : '🔅 50%') : '--';
+          const _mmiStr = sig.mmi_score != null ? Number(sig.mmi_score).toFixed(3) + (sig.mmi_valid ? ' ✅' : ' ❌') : '--';
+
+          tooltip.innerHTML = `
+            <div class="tt-header">
+              <span class="sig-badge ${sig.signal.toLowerCase()}">${sig.signal}</span>
+              <span class="sig-badge hold">LIVE</span>
+            </div>
+            <div class="tt-row"><span>Entry</span><span>${sig.price != null ? sig.price.toFixed(dec) : '--'}</span></div>
+            <div class="tt-row"><span>SL</span><span>${sig.sl != null && sig.sl !== 0 ? sig.sl.toFixed(dec) : '--'}</span></div>
+            <div class="tt-row"><span>TP1</span><span>${sig.tp1 != null && sig.tp1 !== 0 ? sig.tp1.toFixed(dec) : '--'}</span></div>
+            <div class="tt-row"><span>TP2</span><span>${sig.tp2 != null && sig.tp2 !== 0 ? sig.tp2.toFixed(dec) : '--'}</span></div>
+            <div class="tt-row"><span>Signal Score</span><span>${_sWord} ${_sNum}%</span></div>
+            <div class="tt-row"><span>Risk</span><span>${_rmStr}</span></div>
+            <div class="tt-row"><span>MMI</span><span>${_mmiStr}</span></div>
+            <div class="tt-row"><span>Regime</span><span>${sig.regime_label || sig.regime || '--'}</span></div>
+            <div class="tt-row"><span>Lot</span><span>${sig.lot || '--'}</span></div>
+            <div class="tt-row"><span>ATR</span><span>${sig.atr != null ? sig.atr : '--'}</span></div>
+          `;
+          const chartRect = container.getBoundingClientRect();
+          tooltip.style.left = (chartRect.left + 8) + 'px';
+          tooltip.style.top = (chartRect.top + 8) + 'px';
+          tooltip.style.display = 'block';
+          return;
+        }
+      }
+
       if (!match) {
         tooltip.style.display = 'none';
         expandedTs = null;
@@ -153,6 +199,25 @@ const ChartManager = (() => {
       const outcomeText = match.outcome || 'Pending';
       const outcomeClass = match.outcome === 'SL' ? 'sell'
         : (match.outcome && (match.outcome.startsWith('hit') || match.outcome.startsWith('TP'))) ? 'buy' : 'hold';
+      // F6 signal score (gate=50%, 2×gate=100%)
+      const _conf = match.confidence != null ? match.confidence : match.meta_confidence;
+      const _thresh = match.confidence_threshold;
+      let _scoreNum = 0;
+      if (_conf != null && _thresh != null && _thresh > 0) {
+        _scoreNum = Math.min(100, Math.round((_conf / (2 * _thresh)) * 100));
+      }
+      const _scoreWord = _scoreNum >= 90 ? '🔥 V.Strong'
+        : _scoreNum >= 70 ? '💪 Strong' : _scoreNum >= 55 ? '👍 Good'
+        : _scoreNum >= 50 ? '✅ Pass' : _scoreNum >= 40 ? '⏳ Building' : '⬜ Weak';
+      const _scoreStr = _conf != null && _thresh != null ? `${_scoreWord} ${_scoreNum}%` : '--';
+
+      // Risk multiplier
+      const _rm = match.risk_multiplier != null ? match.risk_multiplier : null;
+      const _rmStr = _rm != null ? (_rm >= 1.0 ? '🔥 Full' : _rm >= 0.7 ? '⚡ 70%' : '🔅 50%') : '--';
+
+      // MMI
+      const _mmiStr = match.mmi_score != null ? Number(match.mmi_score).toFixed(3) + (match.mmi_valid ? ' ✅' : ' ❌') : '--';
+
       tooltip.innerHTML = `
         <div class="tt-header">
           <span class="sig-badge ${match.direction.toLowerCase()}">${match.direction}</span>
@@ -160,10 +225,14 @@ const ChartManager = (() => {
         </div>
         <div class="tt-row"><span>Entry</span><span>${match.price != null ? match.price.toFixed(dec) : '--'}</span></div>
         <div class="tt-row"><span>SL</span><span>${match.sl != null ? match.sl.toFixed(dec) : '--'}</span></div>
-        <div class="tt-row"><span>tp1</span><span>${match.tp1 != null ? match.tp1.toFixed(dec) : '--'}</span></div>
-        <div class="tt-row"><span>tp2</span><span>${match.tp2 != null ? match.tp2.toFixed(dec) : '--'}</span></div>
+        <div class="tt-row"><span>TP1</span><span>${match.tp1 != null ? match.tp1.toFixed(dec) : '--'}</span></div>
+        <div class="tt-row"><span>TP2</span><span>${match.tp2 != null ? match.tp2.toFixed(dec) : '--'}</span></div>
+        <div class="tt-row"><span>Signal Score</span><span>${_scoreStr}</span></div>
+        <div class="tt-row"><span>Risk</span><span>${_rmStr}</span></div>
+        <div class="tt-row"><span>MMI</span><span>${_mmiStr}</span></div>
+        <div class="tt-row"><span>Regime</span><span>${match.regime_label || match.regime || '--'}</span></div>
         <div class="tt-row"><span>ATR</span><span>${match.atr != null ? match.atr : '--'}</span></div>
-        <div class="tt-row"><span>Model</span><span>${match.model || '--'}</span></div>
+        <div class="tt-row"><span>Model</span><span>${match.model || 'F6'}</span></div>
         ${match.exit_price != null ? `<div class="tt-row"><span>Exit</span><span>${match.exit_price.toFixed(dec)}</span></div>` : ''}
       `;
       const chartRect = container.getBoundingClientRect();
@@ -288,6 +357,7 @@ const ChartManager = (() => {
     }
 
     hasActiveSignal = true;
+    liveSignalData = signal;
     _clearHistoryPriceLines();
 
     _drawPriceLines({ price: signal.price, sl: signal.sl, tp1: signal.tp1, tp2: signal.tp2 }, 'live');
@@ -299,12 +369,20 @@ const ChartManager = (() => {
     if (signal.last_bar) {
       const ts = Math.floor(new Date(signal.last_bar + (signal.last_bar.includes('Z') ? '' : 'Z')).getTime() / 1000);
       liveSignalTs = ts;
+      // Build marker label with signal score if available
+      const _mc = signal.confidence != null ? signal.confidence : signal.meta_confidence;
+      const _mt = signal.confidence_threshold;
+      let _mScore = '';
+      if (_mc != null && _mt != null && _mt > 0) {
+        const _ms = Math.min(100, Math.round((_mc / (2 * _mt)) * 100));
+        _mScore = ' ' + _ms + '%';
+      }
       markers = [{
         time: ts,
         position: dir === 'BUY' ? 'belowBar' : 'aboveBar',
         color: dir === 'BUY' ? '#22c55e' : '#ef4444',
         shape: dir === 'BUY' ? 'arrowUp' : 'arrowDown',
-        text: dir,
+        text: dir + _mScore,
       }];
     }
     _mergeAndSetMarkers();
@@ -516,6 +594,7 @@ const ChartManager = (() => {
     expandedTs = null;
     liveSignalTs = null;
     liveSignalDir = null;
+    liveSignalData = null;
     // Remove price lines from chart BEFORE nulling refs (prevents ghost lines on symbol switch)
     clearSignalLines();
     _clearHistoryPriceLines();

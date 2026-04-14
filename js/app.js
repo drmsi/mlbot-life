@@ -7,7 +7,7 @@
   'use strict';
 
   // ── Config ──────────────────────────────────────────────────────────
-  const BRIDGE_URL  = 'https://mlbot.ddd.bz';
+  const BRIDGE_URL  = 'https://mlbot.ddd.bz';   // default route → strat4/F6 bridge (port 5558)
   const POLL_INTERVAL_MS = 30000;   // poll signals every 30s
   const CANDLE_POLL_MS   = 60000;   // poll candles every 60s
   const MAX_HISTORY      = 50;
@@ -186,10 +186,10 @@
 
           // For BUY signal — check TP before SL (TP wins on same-bar touch)
           if (signal.direction === 'BUY') {
-            // Check TP
+            // Check tp1 first
             if (signal.tp1 != null && signal.tp1 !== 0) {
               if (candle.high >= signal.tp1) {
-                debugLog('HIT_TP', `BUY signal hit TP at ${signal.tp1}`, {
+                debugLog('HIT_TP1', `BUY signal hit tp1 at ${signal.tp1}`, {
                   candle_high: candle.high,
                   bar_time: candle.time
                 });
@@ -209,10 +209,10 @@
           }
           // For SELL signal — check TP before SL
           else if (signal.direction === 'SELL') {
-            // Check TP
+            // Check tp1 first
             if (signal.tp1 != null && signal.tp1 !== 0) {
               if (candle.low <= signal.tp1) {
-                debugLog('HIT_TP', `SELL signal hit TP at ${signal.tp1}`, {
+                debugLog('HIT_TP1', `SELL signal hit tp1 at ${signal.tp1}`, {
                   candle_low: candle.low,
                   bar_time: candle.time
                 });
@@ -259,13 +259,15 @@
         const total = symbolSignals.length;
         const tp = symbolSignals.filter(s => s.outcome === 'hitTp1' || s.outcome === 'hitTp2').length;
         const sl = symbolSignals.filter(s => s.outcome === 'SL').length;
-        const winRate = total > 0 ? ((tp / total) * 100).toFixed(1) : 0;
+        const wins = tp;
+        const winRate = total > 0 ? ((wins / total) * 100).toFixed(1) : 0;
         const pending = trackedSignals.filter(s =>
           s.symbol === symbol && !s.tracked
         ).length;
 
         debugLog('STATS', `Calculated stats for ${symbol}`, {
           total,
+          wins,
           tp,
           sl,
           winRate,
@@ -299,7 +301,7 @@
           // Migrate legacy outcome strings
           for (const s of allSignals) {
             if (s.outcome === 'TP1') s.outcome = 'hitTp1';
-            if (s.outcome === 'TP2') s.outcome = 'hitTp2';
+            if (s.outcome === 'TP2') s.outcome = 'hitTp1';
           }
 
           // Filter to last 30 days
@@ -388,27 +390,34 @@
   const priceEntry   = $('priceEntry');
   const priceSL      = $('priceSL');
   const priceTP1     = $('priceTP1');
-  // tp2 removed — F6 uses single TP + trail
   const probBuy      = $('probBuy');
   const probHold     = $('probHold');
   const probSell     = $('probSell');
   const probBuyPct   = $('probBuyPct');
   const probHoldPct  = $('probHoldPct');
   const probSellPct  = $('probSellPct');
-  const detailATR    = $('detailATR');
-  const detailRegime = $('detailRegime');
-  const detailH1     = $('detailH1');
-  const detailRisk   = $('detailRisk');
+  // ── F6 detail panel refs ─────────────────────────────────────────────
+  const detailModule       = $('detailModule');
+  const detailATR          = $('detailATR');
+  const detailRegime       = $('detailRegime');
+  const detailConfidence   = $('detailConfidence');
+  const detailConfF2       = $('detailConfF2');
+  const detailConfF3       = $('detailConfF3');
+  const detailConfF5       = $('detailConfF5');
+  const detailConfChronos  = $('detailConfChronos');
+  const detailMMI          = $('detailMMI');
+  const detailMMIValid     = $('detailMMIValid');
+  const detailMicroEntry   = $('detailMicroEntry');
+  const detailF5Source     = $('detailF5Source');
+  const detailSLATR        = $('detailSLATR');
+  const detailTP1ATR       = $('detailTP1ATR');
+  const detailTP2ATR       = $('detailTP2ATR');
+  const detailSecureProfit = $('detailSecureProfit');
+  const detailTrailATR     = $('detailTrailATR');
   const historyBody  = $('historyBody');
   // Stats grids are rendered dynamically — no individual KPI refs needed
-  // New fields
   const signalReasonWrap = $('signalReasonWrap');
   const signalReason     = $('signalReason');
-  const detailAlloc      = $('detailAlloc');
-  const detailMaxPos     = $('detailMaxPos');
-  const detailMinDist    = $('detailMinDist');
-  const detailExitMode   = $('detailExitMode');
-  const detailExitHold   = $('detailExitHold');
   const statsErrorBadge  = $('statsErrorBadge');
 
   // ── Init ────────────────────────────────────────────────────────────
@@ -423,7 +432,7 @@
       window.history.replaceState({}, '', url.toString());
     }
     ChartManager.init('chartContainer');
-    renderOverviewGrid(); // show empty grid immediately
+    _renderDashGrid(); // show empty grid immediately
     // Fetch all-symbols stats (independent of selected symbol)
     fetchAllStats();
     fetchAllTradeStats();
@@ -503,9 +512,9 @@
       if (gen !== undefined && gen !== switchId) return;  // stale
       setConnected(true);
 
-      // Cache all symbols data + update overview grid
+      // Cache all symbols data + update dashboard grid
       allSignalsCache = data;
-      renderOverviewGrid();
+      _renderDashGrid();
 
       const sig = data[currentSymbol];
       if (!sig) {
@@ -534,30 +543,17 @@
   }
 
   // ── Overview Grid ────────────────────────────────────────────────────
-  function renderOverviewGrid() {
-    const grid = $('overviewGrid');
-    if (!grid) return;
-    const symbols = ['XAUUSD', 'BTCUSD', 'ETHUSD', 'EURUSD', 'GBPUSD', 'XAGUSD', 'BRENTCMDUSD', 'USDJPY'];
-    const names   = {XAUUSD:'Gold', BTCUSD:'BTC', ETHUSD:'ETH', EURUSD:'EUR', GBPUSD:'GBP', XAGUSD:'Silver', BRENTCMDUSD:'Brent', USDJPY:'JPY'};
-    grid.innerHTML = symbols.map(sym => {
-      const sig = allSignalsCache[sym];
-      const dir = sig ? (sig.signal || 'HOLD') : '?';
-      const dec = getDecimals(sym);
-      const price = sig && sig.price != null ? sig.price.toFixed(dec) : '--';
-      const alloc = sig && sig.capital_allocation_pct != null ? sig.capital_allocation_pct.toFixed(0) + '%' : '--';
-      const isActive = sym === currentSymbol;
-      return `<div class="ov-card${isActive ? ' active' : ''}" data-sym="${sym}" onclick="window._switchSym('${sym}')">
-        <div class="ov-sym">${sym === 'BRENTCMDUSD' ? 'BRENT' : sym}</div>
-        <div class="ov-row">
-          <span class="ov-badge ${dir.toLowerCase()}">${dir}</span>
-          <span class="ov-alloc">${alloc}</span>
-        </div>
-        <div class="ov-price">${price}</div>
-      </div>`;
-    }).join('');
-  }
+  // Dashboard expand/collapse state: false = only active expanded (default)
+  let dashExpandAll = false;
 
-  // Expose switchSymbol globally for overview grid onclick
+  window._toggleDashExpand = function() {
+    dashExpandAll = !dashExpandAll;
+    const btn = $('dashToggle');
+    if (btn) btn.textContent = dashExpandAll ? 'Active Only' : 'Expand All';
+    _renderDashGrid();
+  };
+
+  // Expose switchSymbol globally for dashboard card onclick
   window._switchSym = function(sym) {
     switchSymbol(sym);
   };
@@ -634,8 +630,8 @@
           // Apply server-side outcome if available (migrate old TP1/TP2 → hitTp1/hitTp2)
           if (s.outcome) {
             let outcome = s.outcome;
-            if (outcome === 'TP1' || outcome === 'TP2') outcome = 'hitTp1';
-            if (outcome === 'hitTp2') outcome = 'hitTp1';
+            if (outcome === 'TP1') outcome = 'hitTp1';
+            if (outcome === 'TP2' || outcome === 'hitTp2') outcome = 'hitTp1';
             added.outcome = outcome;
             added.tracked = true;
           }
@@ -732,24 +728,72 @@
   let _sigData = {};
   let _tradeData = {};
 
+  const SYM_NAMES = {XAUUSD:'Gold', BTCUSD:'BTC', ETHUSD:'ETH', EURUSD:'EUR', GBPUSD:'GBP', XAGUSD:'Silver', BRENTCMDUSD:'Brent', USDJPY:'JPY'};
+
   function _renderDashGrid() {
     const grid = $('symDashGrid');
     if (!grid) return;
-    grid.innerHTML = ALL_STATS_SYMBOLS.map(sym => {
-      const sig = _sigData[sym] || { sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
+
+    // Bubble bar — all 8 symbols always shown, active one highlighted
+    const bubbles = dashExpandAll ? '' : ALL_STATS_SYMBOLS
+      .map(sym => {
+        const isActive = sym === currentSymbol;
+        const live = allSignalsCache[sym];
+        const dir = live ? (live.signal || 'HOLD') : '?';
+        const dec = getDecimals(sym);
+        const price = live && live.price != null ? live.price.toFixed(dec) : '--';
+        const label = sym === 'BRENTCMDUSD' ? 'BRENT' : sym;
+        return `<div class="sym-bubble ${dir.toLowerCase()}${isActive ? ' sym-bubble-active' : ''}" onclick="window._switchSym('${sym}')">
+          <span class="sym-bubble-name">${label}</span>
+          <span class="sym-bubble-badge">${dir}</span>
+          <span class="sym-bubble-price">${price}</span>
+        </div>`;
+      }).join('');
+
+    const bubbleBar = bubbles ? `<div class="sym-bubble-bar">${bubbles}</div>` : '';
+
+    // Expanded cards
+    const cards = ALL_STATS_SYMBOLS.filter(sym => dashExpandAll || sym === currentSymbol).map(sym => {
+      const sigStats = _sigData[sym] || { sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
       const tr = _tradeData[sym] || { sym, positions: 0, wr: 0, wins: 0, losses: 0, pnl: 0, pf: null };
-      return `<div class="sym-dash-col">
-        <div class="sym-dash-title">${sym}</div>
+      const isActive = sym === currentSymbol;
+
+      // Live signal info from cache
+      const live = allSignalsCache[sym];
+      const dir = live ? (live.signal || 'HOLD') : '?';
+      const dec = getDecimals(sym);
+      const price = live && live.price != null ? live.price.toFixed(dec) : '--';
+      const confVal = live && (live.confidence != null ? live.confidence : live.meta_confidence);
+      const confThresh = live && live.confidence_threshold;
+      let scoreStr = '--';
+      if (confVal != null && confThresh != null && confThresh > 0) {
+        const s = Math.min(100, Math.round((confVal / (2 * confThresh)) * 100));
+        const w = s >= 90 ? '🔥' : s >= 70 ? '💪' : s >= 55 ? '👍' : s >= 50 ? '✅' : s >= 40 ? '⏳' : '⬜';
+        scoreStr = w + ' ' + s + '%';
+      }
+      const name = SYM_NAMES[sym] || sym;
+
+      return `<div class="sym-dash-col${isActive ? ' active' : ''}" onclick="window._switchSym('${sym}')" style="cursor:pointer">
+        <div class="sym-dash-header">
+          <span class="sym-dash-title">${sym === 'BRENTCMDUSD' ? 'BRENT' : sym} <span style="opacity:0.5;font-size:0.8em">${name}</span></span>
+          <span class="ov-badge ${dir.toLowerCase()}">${dir}</span>
+        </div>
+        <div class="sym-dash-live">
+          <span class="sym-dash-price">${price}</span>
+          <span class="sym-dash-score">${scoreStr}</span>
+        </div>
         <div class="sym-dash-section sym-dash-section-signals">
-          <div class="sym-dash-section-title">Signal Performance <span class="sym-dash-period">30d</span></div>
-          ${_signalKpiRow(sig)}
+          <div class="sym-dash-section-title">Signals <span class="sym-dash-period">30d</span></div>
+          ${_signalKpiRow(sigStats)}
         </div>
         <div class="sym-dash-section sym-dash-section-trades">
-          <div class="sym-dash-section-title">Trade Execution <span class="sym-dash-period">30d</span></div>
+          <div class="sym-dash-section-title">Trades <span class="sym-dash-period">30d</span></div>
           ${_tradeKpiRow(tr)}
         </div>
       </div>`;
     }).join('');
+
+    grid.innerHTML = bubbleBar + cards;
   }
 
   async function fetchAllStats() {
@@ -773,6 +817,7 @@
           if (!r) continue;
           total += r.total || 0; completed += r.completed || 0;
           pending += r.pending || 0; tp += r.tp || 0; sl += r.sl || 0;
+
           pnl += r.pnl_pips || 0;
         }
         const wr = completed > 0 ? Math.round((tp / completed) * 1000) / 10 : 0;
@@ -860,37 +905,61 @@
     probHoldPct.textContent = hp.toFixed(1) + '%';
     probSellPct.textContent = sp.toFixed(1) + '%';
 
-    // Details
-    detailATR.textContent    = sig.atr != null ? sig.atr : '--';
-    detailRegime.textContent = sig.regime_label || '--';
-    detailH1.textContent     = sig.h1_confluence || '--';
-    detailRisk.textContent   = sig.risk_multiplier != null ? sig.risk_multiplier + 'x' : '--';
-    if (detailAlloc) {
-      detailAlloc.textContent = sig.capital_allocation_pct != null
-        ? sig.capital_allocation_pct.toFixed(0) + '%'
-        : '--';
-    }
-    const sh = sig.shihda || {};
-    if (detailMaxPos) detailMaxPos.textContent = sig.max_open_positions != null ? sig.max_open_positions : '--';
-    if (detailMinDist) detailMinDist.textContent = sh.min_distance_atr != null ? sh.min_distance_atr + ' ATR' : '--';
-    if (detailExitMode) detailExitMode.textContent = sh.exit_mode || '--';
-    if (detailExitHold) detailExitHold.textContent = sh.exit_on_hold != null ? (sh.exit_on_hold ? 'Yes' : 'No') : '--';
+    // ── F6 detail panel ─────────────────────────────────────────────
+    const fmtPct  = v => (v == null ? '--' : (v * 100).toFixed(1) + '%');
+    const fmtBool = v => (v == null ? '--' : (v ? 'Pass' : 'Block'));
 
-    // F5 structural level predictor
-    const f5Src = document.getElementById('detailF5Source');
-    const f5Trail = document.getElementById('detailTrailATR');
-    const f5Secure = document.getElementById('detailSecureProfit');
-    if (f5Src) {
+    // USD conversion helpers
+    const _lot = sig.lot || 0.01;
+    const _ppl = sig.pnl_per_lot || 100;
+    const _price = sig.price || 0;
+    const priceUsd = (level) => {
+      if (level == null || level === 0 || _price === 0) return null;
+      return Math.abs(_price - level) * _lot * _ppl;
+    };
+    const fmtUsd = v => (v == null ? '--' : '$' + v.toFixed(2));
+    const secureUsd = (sig.secure_profit_usd_per_lot || 0) * _lot;
+    const trailStepUsd = (sig.trail_step_per_lot || 0) * _lot;
+
+    // Gate-based score: 50% = at gate, 100% = 2× gate (same as Telegram Signal Score)
+    const _confThresh = sig.confidence_threshold;
+    const gateScore = (v) => {
+      if (v == null || _confThresh == null || _confThresh <= 0) return '--';
+      const s = Math.min(100, Math.round((v / (2 * _confThresh)) * 100));
+      const w = s >= 90 ? '🔥' : s >= 70 ? '💪' : s >= 55 ? '👍' : s >= 50 ? '✅' : s >= 40 ? '⏳' : '⬜';
+      return `${w} ${s}%`;
+    };
+
+    if (detailModule)     detailModule.textContent     = (sig.module || sig.model_used || '--').toString().toUpperCase();
+    if (detailATR)        detailATR.textContent        = sig.atr != null ? sig.atr : '--';
+    if (detailRegime)     detailRegime.textContent     = sig.regime_label || sig.regime || '--';
+    if (detailConfidence) detailConfidence.textContent = gateScore(sig.confidence != null ? sig.confidence : sig.meta_confidence);
+    if (detailConfF2)     detailConfF2.textContent     = gateScore(sig.confidence_f2);
+    if (detailConfF3)     detailConfF3.textContent     = gateScore(sig.confidence_f3);
+    if (detailConfF5)     detailConfF5.textContent     = gateScore(sig.confidence_f5);
+    if (detailConfChronos)detailConfChronos.textContent= gateScore(sig.confidence_chronos);
+    if (detailMMI)        detailMMI.textContent        = sig.mmi_score != null ? (+sig.mmi_score).toFixed(3) : '--';
+    if (detailMMIValid) {
+      detailMMIValid.textContent = fmtBool(sig.mmi_valid);
+      detailMMIValid.style.color = sig.mmi_valid === false ? '#ff5252' : (sig.mmi_valid ? '#00e676' : '#888');
+    }
+    if (detailMicroEntry) {
+      const me = sig.micro_entry_valid;
+      const meScore = sig.micro_entry_score != null ? ' (' + (+sig.micro_entry_score).toFixed(2) + ')' : '';
+      detailMicroEntry.textContent = (me == null ? '--' : (me ? 'Pass' : 'Block')) + (me != null ? meScore : '');
+      detailMicroEntry.style.color = me === false ? '#ff5252' : (me ? '#00e676' : '#888');
+    }
+
+    // F6 native quantile SL/TP source
+    if (detailF5Source) {
       const src = sig.f5_source || 'atr_fallback';
-      f5Src.textContent = src === 'f5' ? 'F5 Structural' : 'ATR Default';
-      f5Src.style.color = src === 'f5' ? '#00e5ff' : '#888';
+      detailF5Source.textContent = src === 'f6_native' ? 'F6 Native' : (src === 'f5' ? 'F5 Structural' : 'ATR Default');
+      detailF5Source.style.color = src === 'f6_native' ? '#00e5ff' : (src === 'f5' ? '#00e5ff' : '#888');
     }
-    if (f5Trail) {
-      f5Trail.textContent = sig.f5_trail_atr != null ? sig.f5_trail_atr + ' ATR' : '--';
-    }
-    if (f5Secure) {
-      f5Secure.textContent = sig.f5_secure_profit != null ? sig.f5_secure_profit + ' ATR' : '--';
-    }
+    if (detailSLATR)        detailSLATR.textContent        = fmtUsd(priceUsd(sig.sl));
+    if (detailTP1ATR)       detailTP1ATR.textContent       = fmtUsd(priceUsd(sig.tp1));
+    if (detailSecureProfit) detailSecureProfit.textContent = secureUsd > 0 ? fmtUsd(secureUsd) : '--';
+    if (detailTrailATR)     detailTrailATR.textContent     = trailStepUsd > 0 ? fmtUsd(trailStepUsd) : '--';
 
     // Last bar
     if (sig.last_bar) {
@@ -914,15 +983,23 @@
     probBuyPct.textContent = '--';
     probHoldPct.textContent = '--';
     probSellPct.textContent = '--';
-    detailATR.textContent = '--';
-    detailRegime.textContent = '--';
-    detailH1.textContent = '--';
-    detailRisk.textContent = '--';
-    if (detailAlloc) detailAlloc.textContent = '--';
-    if (detailMaxPos) detailMaxPos.textContent = '--';
-    if (detailMinDist) detailMinDist.textContent = '--';
-    if (detailExitMode) detailExitMode.textContent = '--';
-    if (detailExitHold) detailExitHold.textContent = '--';
+    if (detailModule)       detailModule.textContent       = '--';
+    if (detailATR)          detailATR.textContent          = '--';
+    if (detailRegime)       detailRegime.textContent       = '--';
+    if (detailConfidence)   detailConfidence.textContent   = '--';
+    if (detailConfF2)       detailConfF2.textContent       = '--';
+    if (detailConfF3)       detailConfF3.textContent       = '--';
+    if (detailConfF5)       detailConfF5.textContent       = '--';
+    if (detailConfChronos)  detailConfChronos.textContent  = '--';
+    if (detailMMI)          detailMMI.textContent          = '--';
+    if (detailMMIValid)     detailMMIValid.textContent     = '--';
+    if (detailMicroEntry)   detailMicroEntry.textContent   = '--';
+    if (detailF5Source)     detailF5Source.textContent     = '--';
+    if (detailSLATR)        detailSLATR.textContent        = '--';
+    if (detailTP1ATR)       detailTP1ATR.textContent       = '--';
+    if (detailTP2ATR)       detailTP2ATR.textContent       = '--';
+    if (detailSecureProfit) detailSecureProfit.textContent = '--';
+    if (detailTrailATR)     detailTrailATR.textContent     = '--';
     if (signalReasonWrap) signalReasonWrap.style.display = 'none';
     ChartManager.clearSignalLines();
   }
@@ -983,7 +1060,7 @@
         <td>${h.tp1}</td>
         <td><span class="sig-badge ${h.outcomeClass}">${h.outcome === 'hitTp1' || h.outcome === 'hitTp2' ? 'TP' : h.outcome}</span></td>
         <td>${h.strength}</td>
-        <td><span style="color:${h.f5Source === 'f5' ? '#00e5ff' : '#666'}">${h.f5Source === 'f5' ? 'F5' : 'ATR'}</span></td>
+        <td><span style="color:${h.f5Source === 'f6_native' ? '#00e5ff' : h.f5Source === 'f5' ? '#00e5ff' : '#666'}">${h.f5Source === 'f6_native' ? 'F6' : h.f5Source === 'f5' ? 'F5' : 'ATR'}</span></td>
       </tr>
     `).join('');
   }

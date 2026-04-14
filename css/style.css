@@ -137,6 +137,88 @@ a:hover { color: #818cf8; }
   padding: 12px;
   min-width: 0;
   overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.sym-dash-col:hover {
+  border-color: #6366f1;
+}
+.sym-dash-col.active {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.3);
+}
+/* Bubble bar — compact pills for inactive symbols */
+.sym-bubble-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.sym-bubble {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  font-size: 0.75rem;
+}
+.sym-bubble:hover {
+  border-color: #6366f1;
+  background: rgba(99,102,241,0.08);
+}
+.sym-bubble.sym-bubble-active {
+  border-color: #818cf8;
+  background: rgba(99,102,241,0.15);
+  box-shadow: 0 0 0 1px rgba(99,102,241,0.3);
+}
+.sym-bubble-name {
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+.sym-bubble-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.sym-bubble.buy .sym-bubble-badge { background: rgba(34,197,94,0.2); color: #22c55e; }
+.sym-bubble.sell .sym-bubble-badge { background: rgba(239,68,68,0.2); color: #ef4444; }
+.sym-bubble.hold .sym-bubble-badge { background: rgba(128,128,128,0.15); color: #888; }
+.sym-bubble-price {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.sym-dash-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+.sym-dash-toggle {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.sym-dash-toggle:hover {
+  border-color: #6366f1;
+  color: var(--text-primary);
+}
+.sym-dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
 }
 .sym-dash-title {
   font-size: 0.95rem;
@@ -144,8 +226,24 @@ a:hover { color: #818cf8; }
   font-family: var(--font-mono);
   color: var(--text-primary);
   letter-spacing: 1px;
+}
+.sym-dash-live {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 10px;
-  text-align: center;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.sym-dash-price {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+.sym-dash-score {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 .sym-dash-section {
   margin-bottom: 8px;
