@@ -43,15 +43,15 @@
         <span class="hero-highlight">in Real Time</span>
       </h1>
       <p class="hero-subtitle">
-        Watch our LightGBM machine learning model analyze markets live.
-        Every 5 minutes, the model processes 80+ technical features across multiple symbols
+        Watch our F6 ensemble model analyze markets live.
+        Every 5 minutes, the model processes 110+ technical features across 8 symbols
         to generate high-probability BUY, SELL, or HOLD signals — complete with
         precise entry, stop-loss, and take-profit levels. Original signal outcomes are tracked
         independently of trade execution to show true signal performance.
       </p>
       <div class="hero-stats">
         <div class="stat-card">
-          <span class="stat-value">80+</span>
+          <span class="stat-value">110+</span>
           <span class="stat-label">ML Features</span>
         </div>
         <div class="stat-card">
@@ -125,12 +125,8 @@
               <span class="price-value" id="priceSL">--</span>
             </div>
             <div class="price-row tp1">
-              <span class="price-label">tp1</span>
+              <span class="price-label">Take Profit</span>
               <span class="price-value" id="priceTP1">--</span>
-            </div>
-            <div class="price-row tp2">
-              <span class="price-label">tp2</span>
-              <span class="price-value" id="priceTP2">--</span>
             </div>
           </div>
           <div class="signal-probs">
@@ -206,15 +202,14 @@
               <th>Signal</th>
               <th>Entry</th>
               <th>SL</th>
-              <th>tp1</th>
-              <th>tp2</th>
+              <th>TP</th>
               <th>Outcome</th>
               <th>Strength</th>
               <th>Source</th>
             </tr>
           </thead>
           <tbody id="historyBody">
-            <tr class="empty-row"><td colspan="10">Waiting for signals...</td></tr>
+            <tr class="empty-row"><td colspan="9">Waiting for signals...</td></tr>
           </tbody>
         </table>
       </div>
@@ -288,6 +283,6 @@
   <div id="signalTooltip" class="signal-tooltip"></div>
 
   <script src="js/chart.js"></script>
-  <script src="js/app.js?v=7"></script>
+  <script src="js/app.js?v=8"></script>
 </body>
 </html>

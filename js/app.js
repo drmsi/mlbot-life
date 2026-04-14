@@ -59,12 +59,11 @@
           entry: sig.price,
           sl: sig.sl,
           tp1: sig.tp1,
-          tp2: sig.tp2,
           bar_time: sig.last_bar,
           model: sig.model_used,
           atr: sig.atr,
           tracked: false,
-          outcome: null, // 'hitTp1', 'hitTp2', 'SL', 'Pending'
+          outcome: null, // 'hitTp1', 'SL', 'Pending'
           outcome_bar: null,
           checked_bars: 0,
           max_check_bars: 100 // Maximum bars to check (500 minutes for M5)
@@ -86,7 +85,6 @@
           direction: signal.direction,
           entry: signal.entry,
           tp1: signal.tp1,
-          tp2: signal.tp2,
           sl: signal.sl
         });
 
@@ -188,23 +186,13 @@
 
           // For BUY signal — check TP before SL (TP wins on same-bar touch)
           if (signal.direction === 'BUY') {
-            // Check tp1 first
+            // Check TP
             if (signal.tp1 != null && signal.tp1 !== 0) {
               if (candle.high >= signal.tp1) {
-                debugLog('HIT_TP1', `BUY signal hit tp1 at ${signal.tp1}`, {
+                debugLog('HIT_TP', `BUY signal hit TP at ${signal.tp1}`, {
                   candle_high: candle.high,
                   bar_time: candle.time
                 });
-                // Continue checking for tp2 in same or later candles
-                for (let j = i; j < candles.length; j++) {
-                  if (signal.tp2 != null && signal.tp2 !== 0 && candles[j].high >= signal.tp2) {
-                    debugLog('HIT_TP2', `BUY signal hit tp2 at ${signal.tp2}`, {
-                      candle_high: candles[j].high,
-                      bar_time: candles[j].time
-                    });
-                    return { outcome: 'hitTp2', bar_time: candles[j].time };
-                  }
-                }
                 return { outcome: 'hitTp1', bar_time: candle.time };
               }
             }
@@ -221,23 +209,13 @@
           }
           // For SELL signal — check TP before SL
           else if (signal.direction === 'SELL') {
-            // Check tp1 first
+            // Check TP
             if (signal.tp1 != null && signal.tp1 !== 0) {
               if (candle.low <= signal.tp1) {
-                debugLog('HIT_TP1', `SELL signal hit tp1 at ${signal.tp1}`, {
+                debugLog('HIT_TP', `SELL signal hit TP at ${signal.tp1}`, {
                   candle_low: candle.low,
                   bar_time: candle.time
                 });
-                // Continue checking for tp2
-                for (let j = i; j < candles.length; j++) {
-                  if (signal.tp2 != null && signal.tp2 !== 0 && candles[j].low <= signal.tp2) {
-                    debugLog('HIT_TP2', `SELL signal hit tp2 at ${signal.tp2}`, {
-                      candle_low: candles[j].low,
-                      bar_time: candles[j].time
-                    });
-                    return { outcome: 'hitTp2', bar_time: candles[j].time };
-                  }
-                }
                 return { outcome: 'hitTp1', bar_time: candle.time };
               }
             }
@@ -279,26 +257,22 @@
         );
 
         const total = symbolSignals.length;
-        const tp1 = symbolSignals.filter(s => s.outcome === 'hitTp1').length;
-        const tp2 = symbolSignals.filter(s => s.outcome === 'hitTp2').length;
+        const tp = symbolSignals.filter(s => s.outcome === 'hitTp1' || s.outcome === 'hitTp2').length;
         const sl = symbolSignals.filter(s => s.outcome === 'SL').length;
-        const wins = tp1 + tp2;
-        const winRate = total > 0 ? ((wins / total) * 100).toFixed(1) : 0;
+        const winRate = total > 0 ? ((tp / total) * 100).toFixed(1) : 0;
         const pending = trackedSignals.filter(s =>
           s.symbol === symbol && !s.tracked
         ).length;
 
         debugLog('STATS', `Calculated stats for ${symbol}`, {
           total,
-          wins,
-          tp1,
-          tp2,
+          tp,
           sl,
           winRate,
           pending
         });
 
-        return { total, tp: wins, sl, win_rate: parseFloat(winRate), pending };
+        return { total, tp, sl, win_rate: parseFloat(winRate), pending };
       } catch (error) {
         errorLog('STATS', `Error calculating stats for ${symbol}`, error);
         return { total: 0, tp: 0, sl: 0, win_rate: 0, pending: 0 };
@@ -414,7 +388,7 @@
   const priceEntry   = $('priceEntry');
   const priceSL      = $('priceSL');
   const priceTP1     = $('priceTP1');
-  const priceTP2     = $('priceTP2');
+  // tp2 removed — F6 uses single TP + trail
   const probBuy      = $('probBuy');
   const probHold     = $('probHold');
   const probSell     = $('probSell');
@@ -648,7 +622,6 @@
           price: s.price,
           sl: s.sl,
           tp1: s.tp1,
-          tp2: s.tp2,
           last_bar: s.bar_time,
           symbol: sym,
           model_used: s.model || '--',
@@ -661,8 +634,8 @@
           // Apply server-side outcome if available (migrate old TP1/TP2 → hitTp1/hitTp2)
           if (s.outcome) {
             let outcome = s.outcome;
-            if (outcome === 'TP1') outcome = 'hitTp1';
-            if (outcome === 'TP2') outcome = 'hitTp2';
+            if (outcome === 'TP1' || outcome === 'TP2') outcome = 'hitTp1';
+            if (outcome === 'hitTp2') outcome = 'hitTp1';
             added.outcome = outcome;
             added.tracked = true;
           }
@@ -733,8 +706,7 @@
     return `<div class="sym-kpi-row">
       <div class="sym-kpi"><span class="sym-kpi-value">${r.total || '--'}</span><span class="sym-kpi-label">Signals</span></div>
       <div class="sym-kpi ${wrClass}"><span class="sym-kpi-value">${r.total > 0 ? r.wr + '%' : '--'}</span><span class="sym-kpi-label">Win Rate</span></div>
-      <div class="sym-kpi kpi-green"><span class="sym-kpi-value">${r.total > 0 ? r.tp1 : '--'}</span><span class="sym-kpi-label">TP1</span></div>
-      <div class="sym-kpi kpi-green"><span class="sym-kpi-value">${r.total > 0 ? r.tp2 : '--'}</span><span class="sym-kpi-label">TP2</span></div>
+      <div class="sym-kpi kpi-green"><span class="sym-kpi-value">${r.total > 0 ? r.tp : '--'}</span><span class="sym-kpi-label">TP</span></div>
       <div class="sym-kpi kpi-red"><span class="sym-kpi-value">${r.total > 0 ? r.sl : '--'}</span><span class="sym-kpi-label">SL</span></div>
       <div class="sym-kpi ${r.total > 0 ? pnlClass : ''}"><span class="sym-kpi-value">${pnlText}</span><span class="sym-kpi-label">P&L</span></div>
       <div class="sym-kpi"><span class="sym-kpi-value">${r.total > 0 ? r.pending : '--'}</span><span class="sym-kpi-label">Pending</span></div>
@@ -796,19 +768,18 @@
             .then(json => json && json[sym] ? json[sym] : null)
             .catch(() => null)
         ));
-        let total = 0, completed = 0, pending = 0, tp = 0, tp1 = 0, tp2 = 0, sl = 0, pnl = 0;
+        let total = 0, completed = 0, pending = 0, tp = 0, sl = 0, pnl = 0;
         for (const r of dailyResults) {
           if (!r) continue;
           total += r.total || 0; completed += r.completed || 0;
           pending += r.pending || 0; tp += r.tp || 0; sl += r.sl || 0;
-          tp1 += r.tp1 || 0; tp2 += r.tp2 || 0;
           pnl += r.pnl_pips || 0;
         }
         const wr = completed > 0 ? Math.round((tp / completed) * 1000) / 10 : 0;
         pnl = Math.round(pnl * 100) / 100;
-        _sigData[sym] = { sym, total, tp, tp1, tp2, sl, pending, wr, pnl };
+        _sigData[sym] = { sym, total, tp, sl, pending, wr, pnl };
       } catch (err) {
-        _sigData[sym] = { sym, total: 0, tp: 0, tp1: 0, tp2: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
+        _sigData[sym] = { sym, total: 0, tp: 0, sl: 0, pending: 0, wr: 0, pnl: 0 };
       }
     }
     _renderDashGrid();
@@ -877,7 +848,6 @@
     priceEntry.textContent = sig.price != null ? sig.price.toFixed(dec) : '--';
     priceSL.textContent    = (sig.sl != null && sig.sl !== 0)  ? sig.sl.toFixed(dec)  : (dir !== 'HOLD' ? 'Trail' : '--');
     priceTP1.textContent   = (sig.tp1 != null && sig.tp1 !== 0) ? sig.tp1.toFixed(dec) : '--';
-    priceTP2.textContent   = (sig.tp2 != null && sig.tp2 !== 0) ? sig.tp2.toFixed(dec) : '--';
 
     // Probabilities
     const bp = (sig.buy_prob  || 0) * 100;
@@ -938,7 +908,6 @@
     priceEntry.textContent = '--';
     priceSL.textContent = '--';
     priceTP1.textContent = '--';
-    priceTP2.textContent = '--';
     probBuy.style.width = '0%';
     probHold.style.width = '0%';
     probSell.style.width = '0%';
@@ -989,7 +958,6 @@
       entry:    sig.price != null ? sig.price.toFixed(dec) : '--',
       sl:       (sig.sl != null && sig.sl !== 0)   ? sig.sl.toFixed(dec)  : 'Trail',
       tp1:      (sig.tp1 != null && sig.tp1 !== 0) ? sig.tp1.toFixed(dec) : '--',
-      tp2:      (sig.tp2 != null && sig.tp2 !== 0) ? sig.tp2.toFixed(dec) : '--',
       strength: sig.strength_label || '--',
       outcome:  outcome,
       outcomeClass: outcomeClass,
@@ -1002,7 +970,7 @@
 
   function renderHistory() {
     if (signalHistory.length === 0) {
-      historyBody.innerHTML = '<tr class="empty-row"><td colspan="10">Waiting for signals...</td></tr>';
+      historyBody.innerHTML = '<tr class="empty-row"><td colspan="9">Waiting for signals...</td></tr>';
       return;
     }
     historyBody.innerHTML = signalHistory.map(h => `
@@ -1013,8 +981,7 @@
         <td>${h.entry}</td>
         <td>${h.sl}</td>
         <td>${h.tp1}</td>
-        <td>${h.tp2}</td>
-        <td><span class="sig-badge ${h.outcomeClass}">${h.outcome === 'hitTp1' ? 'tp1' : h.outcome === 'hitTp2' ? 'tp2' : h.outcome}</span></td>
+        <td><span class="sig-badge ${h.outcomeClass}">${h.outcome === 'hitTp1' || h.outcome === 'hitTp2' ? 'TP' : h.outcome}</span></td>
         <td>${h.strength}</td>
         <td><span style="color:${h.f5Source === 'f5' ? '#00e5ff' : '#666'}">${h.f5Source === 'f5' ? 'F5' : 'ATR'}</span></td>
       </tr>
